@@ -1,0 +1,120 @@
+version: '3.8'
+
+# Общие переменные окружения через YAML anchor
+x-laravel-env: &laravel-env
+    APP_ENV: production
+    APP_DEBUG: 'false'
+    APP_KEY: base64:pX5dF0MJvDJBBgX90kHHhoc3+I7v7zYL428PO4PHZJ4=
+    DB_CONNECTION: pgsql
+    DB_HOST: db
+    DB_PORT: 5432
+    DB_DATABASE: laravel
+    DB_USERNAME: laravel
+    DB_PASSWORD: password
+    REDIS_CLIENT: phpredis
+    REDIS_HOST: redis
+    REDIS_PASSWORD: 'null'
+    REDIS_PORT: 6379
+    REDIS_DB: '0'
+    REDIS_CACHE_DB: '1'
+    CACHE_STORE: redis
+    QUEUE_CONNECTION: redis
+    MOONSHINE_USERNAME: admin@example.com
+    MOONSHINE_NAME: Admin
+    MOONSHINE_PASSWORD: 111111
+
+services:
+    migrate:
+        image: my-laravel-app
+        build: .
+        environment: *laravel-env
+        entrypoint: ["sh", "-c", "php artisan migrate --force && php artisan moonshine:create-user"]
+        depends_on:
+            db:
+                condition: service_healthy
+            redis:
+                condition: service_started
+        # Запускается один раз и завершается
+        restart: "no"
+
+    app:
+        image: my-laravel-app
+        ports:
+            - "80:8000"
+        environment:
+            <<: *laravel-env
+        volumes:
+            - storage:/app/storage/
+        depends_on:
+            migrate:  # Гарантирует, что миграции выполнены
+                condition: service_completed_successfully
+            db:
+                condition: service_healthy
+            redis:
+                condition: service_started
+        restart: unless-stopped
+
+    queue:
+        image: my-laravel-app
+        entrypoint: ["php", "artisan", "queue:work", "--timeout=7200"]
+        environment:
+            <<: *laravel-env
+        deploy:
+            mode: replicated
+            replicas: 2
+        volumes:
+            - storage:/app/storage/
+        depends_on:
+            migrate:
+                condition: service_completed_successfully
+            db:
+                condition: service_healthy
+            redis:
+                condition: service_started
+        restart: unless-stopped
+
+    schedule:
+        image: my-laravel-app
+        entrypoint: ["php", "artisan", "schedule:work"]
+        environment:
+            <<: *laravel-env
+        volumes:
+            - storage:/app/storage/
+        depends_on:
+            migrate:
+                condition: service_completed_successfully
+            db:
+                condition: service_healthy
+            redis:
+                condition: service_started
+        restart: unless-stopped
+
+    db:
+        image: postgres:17
+        environment:
+            POSTGRES_DB: laravel
+            POSTGRES_USER: laravel
+            POSTGRES_PASSWORD: password
+        volumes:
+            - psql_data:/var/lib/postgresql/data
+        ports:
+            - '5432:5432'
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U laravel -d laravel -h localhost"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
+        restart: unless-stopped
+
+    redis:
+        image: redis:alpine
+        ports:
+            - "6379:6379"
+        volumes:
+            - redis_data:/data
+        restart: unless-stopped
+
+volumes:
+    psql_data:
+    redis_data:
+    storage:

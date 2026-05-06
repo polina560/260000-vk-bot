@@ -1,0 +1,40 @@
+stages:
+  - test
+
+tests:
+  stage: test
+  image: php:8.5-cli
+  variables:
+    XDEBUG_MODE: coverage
+  only:
+    - merge_requests
+    - main
+  cache:
+    key:
+      files:
+        - composer.json
+    paths:
+      - vendor/
+  before_script:
+    # Установка зависимостей
+    - apt-get update && apt-get install -y git zip unzip wget libzip-dev libonig-dev libxml2-dev
+    # Установка PHP-расширений
+    - docker-php-ext-install exif bcmath xml zip
+    # Установка xdebug
+    - pecl install xdebug && docker-php-ext-enable xdebug
+    # Установка Composer
+    - curl -sS https://getcomposer.org/installer | php
+    - php composer.phar install --no-interaction --no-progress --prefer-dist
+    # Копируем .env.testing в .env
+    - cp .env.testing .env
+    # Генерация APP_KEY
+    - php artisan key:generate --env=testing
+    - php artisan config:clear
+
+  script:
+    - php artisan test --coverage-text --coverage-cobertura=coverage.cobertura.xml
+  artifacts:
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: coverage.cobertura.xml

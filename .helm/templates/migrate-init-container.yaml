@@ -1,0 +1,59 @@
+{{- define "laravel-chart.initContainers.migrate" }}
+initContainers:
+  - name: run-migrations
+    image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+    command: ["/bin/sh", "-c"]
+    args:
+      - |
+        echo "Running migrations..."
+        php artisan migrate --force
+        echo "Migrations completed."
+        echo "Creating default administrator..."
+        php artisan moonshine:create-user
+    env:
+      - name: APP_ENV
+        value: {{ .Values.laravel.appEnv | quote }}
+      - name: APP_DEBUG
+        value: {{ .Values.laravel.appDebug | quote }}
+      - name: APP_KEY
+        value: {{ .Values.laravel.appKey | quote }}
+      - name: DB_CONNECTION
+        value: "pgsql"
+      - name: DB_HOST
+        value: {{ .Values.externalDatabase.host | quote }}
+      - name: DB_PORT
+        value: {{ .Values.externalDatabase.port | quote }}
+      - name: DB_DATABASE
+        value: {{ .Values.externalDatabase.database | quote }}
+      - name: DB_USERNAME
+        value: {{ .Values.externalDatabase.username | quote }}
+      - name: DB_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: {{ include "laravel-chart.fullname" . }}-db-secret
+            key: password
+      - name: LOG_CHANNEL
+        value: "stack"
+      - name: LOG_STACK
+        value: {{ .Values.logging.stack | quote }}
+      - name: LOG_DEPRECATIONS_CHANNEL
+        value: "null"
+      - name: LOG_LEVEL
+        value: "debug"
+      - name: REDIS_CLIENT
+        value: "phpredis"
+      - name: REDIS_HOST
+        value: {{ .Values.externalRedis.host | quote }}
+      - name: REDIS_PORT
+        value: {{ .Values.externalRedis.port | quote }}
+      - name: REDIS_PASSWORD
+        value: {{ .Values.externalRedis.password | quote }}
+      - name: REDIS_DB
+        value: {{ .Values.externalRedis.db | quote }}
+      - name: REDIS_CACHE_DB
+        value: {{ .Values.externalRedis.cacheDb | quote }}
+      - name: CACHE_STORE
+        value: "redis"
+      - name: QUEUE_CONNECTION
+        value: "redis"
+  {{- end }}

@@ -1,0 +1,90 @@
+# Default values for laravel-chart.
+image:
+  repository: cr.yandex/****/my-laravel-app
+  pullPolicy: IfNotPresent
+  tag: "0.0.1"
+
+# Внешние зависимости
+externalDatabase:
+  host: "c-***.rw.mdb.yandexcloud.net"  # Подставьте реальный хост
+  port: 6432
+  database: db1
+  username: user1
+  password: ""  # Будет передан через Secret
+
+externalRedis:
+  host: "c-***.rw.mdb.yandexcloud.net"     # Подставьте реальный хост
+  port: 6379
+  password: ""
+  db: 0
+  cacheDb: 1
+
+# Laravel env vars
+laravel:
+  appEnv: production
+  appDebug: false
+  appKey: "base64:pX5dF0MJvDJBBgX90kHHhoc3+I7v7zYL428PO4PHZJ4="
+  moonshineUsername: admin@example.com
+  moonshineName: Admin
+  moonshinePassword: 111111
+
+# Deployment
+replicaCount: 2
+resources:
+  limits:
+    cpu: "2"
+    memory: 2Gi
+  requests:
+    cpu: 250m
+    memory: 512Mi
+
+service:
+  type: ClusterIP
+  port: 8000
+
+logging:
+  stack: "stderr,stdout"
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: http01-clusterissuer
+  hosts:
+    - host: laravel.k8s-ppprs.ru
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: myapp-tls
+      hosts:
+        - laravel.k8s-ppprs.ru
+
+# Queue workers
+queueWorkers:
+  replicaCount: 2
+  resources:
+    limits:
+      cpu: 500m
+      memory: 1Gi
+    requests:
+      cpu: 250m
+      memory: 512Mi
+
+# Scheduler worker
+schedulerWorker:
+  enabled: true
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+# Storage
+persistence:
+  enabled: true
+  size: 1Gi
+  storageClass: ""

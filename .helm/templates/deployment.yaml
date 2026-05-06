@@ -1,0 +1,237 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "laravel-chart.fullname" . }}
+  labels:
+    {{ include "laravel-chart.labels" . | nindent 4 }}
+    app.kubernetes.io/component: app
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{ include "laravel-chart.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: app
+  template:
+    metadata:
+      labels:
+        {{ include "laravel-chart.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: app
+    spec:
+      {{ include "laravel-chart.initContainers.migrate" . | nindent 6 }}
+      containers:
+        - name: app
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          ports:
+            - containerPort: 8000
+          env:
+            - name: APP_ENV
+              value: {{ .Values.laravel.appEnv | quote }}
+            - name: APP_DEBUG
+              value: {{ .Values.laravel.appDebug | quote }}
+            - name: APP_KEY
+              value: {{ .Values.laravel.appKey | quote }}
+            - name: DB_CONNECTION
+              value: "pgsql"
+            - name: DB_HOST
+              value: {{ .Values.externalDatabase.host | quote }}
+            - name: DB_PORT
+              value: {{ .Values.externalDatabase.port | quote }}
+            - name: DB_DATABASE
+              value: {{ .Values.externalDatabase.database | quote }}
+            - name: DB_USERNAME
+              value: {{ .Values.externalDatabase.username | quote }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "laravel-chart.fullname" . }}-db-secret
+                  key: password
+            - name: LOG_CHANNEL
+              value: "stack"
+            - name: LOG_STACK
+              value: {{ .Values.logging.stack | quote }}
+            - name: LOG_DEPRECATIONS_CHANNEL
+              value: "null"
+            - name: LOG_LEVEL
+              value: "debug"
+            - name: REDIS_CLIENT
+              value: "phpredis"
+            - name: REDIS_HOST
+              value: {{ .Values.externalRedis.host | quote }}
+            - name: REDIS_PORT
+              value: {{ .Values.externalRedis.port | quote }}
+            - name: REDIS_PASSWORD
+              value: {{ .Values.externalRedis.password | quote }}
+            - name: REDIS_DB
+              value: {{ .Values.externalRedis.db | quote }}
+            - name: REDIS_CACHE_DB
+              value: {{ .Values.externalRedis.cacheDb | quote }}
+            - name: CACHE_STORE
+              value: "redis"
+            - name: QUEUE_CONNECTION
+              value: "redis"
+            - name: MOONSHINE_USERNAME
+              value: {{ .Values.laravel.moonshineUsername | quote }}
+            - name: MOONSHINE_NAME
+              value: {{ .Values.laravel.moonshineName | quote }}
+            - name: MOONSHINE_PASSWORD
+              value: {{ .Values.laravel.moonshinePassword | quote }}
+          resources:
+            {{ toYaml .Values.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /up
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /up
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "laravel-chart.fullname" . }}-queue
+  labels:
+    {{ include "laravel-chart.labels" . | nindent 4 }}
+    app.kubernetes.io/component: queue-worker
+spec:
+  replicas: {{ .Values.queueWorkers.replicaCount }}
+  selector:
+    matchLabels:
+      {{ include "laravel-chart.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: queue-worker
+  template:
+    metadata:
+      labels:
+        {{ include "laravel-chart.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: queue-worker
+    spec:
+      containers:
+        - name: queue-worker
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          command: ["php", "artisan", "queue:work", "--timeout=7200"]
+          env:
+            - name: APP_ENV
+              value: {{ .Values.laravel.appEnv | quote }}
+            - name: APP_DEBUG
+              value: {{ .Values.laravel.appDebug | quote }}
+            - name: APP_KEY
+              value: {{ .Values.laravel.appKey | quote }}
+            - name: DB_CONNECTION
+              value: "pgsql"
+            - name: DB_HOST
+              value: {{ .Values.externalDatabase.host | quote }}
+            - name: DB_PORT
+              value: {{ .Values.externalDatabase.port | quote }}
+            - name: DB_DATABASE
+              value: {{ .Values.externalDatabase.database | quote }}
+            - name: DB_USERNAME
+              value: {{ .Values.externalDatabase.username | quote }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "laravel-chart.fullname" . }}-db-secret
+                  key: password
+            - name: LOG_CHANNEL
+              value: "stack"
+            - name: LOG_STACK
+              value: {{ .Values.logging.stack | quote }}
+            - name: LOG_DEPRECATIONS_CHANNEL
+              value: "null"
+            - name: LOG_LEVEL
+              value: "debug"
+            - name: REDIS_CLIENT
+              value: "phpredis"
+            - name: REDIS_HOST
+              value: {{ .Values.externalRedis.host | quote }}
+            - name: REDIS_PORT
+              value: {{ .Values.externalRedis.port | quote }}
+            - name: REDIS_PASSWORD
+              value: {{ .Values.externalRedis.password | quote }}
+            - name: REDIS_DB
+              value: {{ .Values.externalRedis.db | quote }}
+            - name: REDIS_CACHE_DB
+              value: {{ .Values.externalRedis.cacheDb | quote }}
+            - name: CACHE_STORE
+              value: "redis"
+            - name: QUEUE_CONNECTION
+              value: "redis"
+          resources:
+            {{- toYaml .Values.queueWorkers.resources | nindent 12 }}
+---
+{{- if .Values.schedulerWorker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "laravel-chart.fullname" . }}-scheduler
+  labels:
+    {{ include "laravel-chart.labels" . | nindent 4 }}
+    app.kubernetes.io/component: scheduler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{ include "laravel-chart.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: scheduler
+  template:
+    metadata:
+      labels:
+        {{ include "laravel-chart.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: scheduler
+    spec:
+      containers:
+        - name: scheduler
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          command: ["php", "artisan", "schedule:work"]
+          env:
+            - name: APP_ENV
+              value: {{ .Values.laravel.appEnv | quote }}
+            - name: APP_DEBUG
+              value: {{ .Values.laravel.appDebug | quote }}
+            - name: APP_KEY
+              value: {{ .Values.laravel.appKey | quote }}
+            - name: DB_CONNECTION
+              value: "pgsql"
+            - name: DB_HOST
+              value: {{ .Values.externalDatabase.host | quote }}
+            - name: DB_PORT
+              value: {{ .Values.externalDatabase.port | quote }}
+            - name: DB_DATABASE
+              value: {{ .Values.externalDatabase.database | quote }}
+            - name: DB_USERNAME
+              value: {{ .Values.externalDatabase.username | quote }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "laravel-chart.fullname" . }}-db-secret
+                  key: password
+            - name: LOG_CHANNEL
+              value: "stack"
+            - name: LOG_STACK
+              value: {{ .Values.logging.stack | quote }}
+            - name: LOG_DEPRECATIONS_CHANNEL
+              value: "null"
+            - name: LOG_LEVEL
+              value: "debug"
+            - name: REDIS_CLIENT
+              value: "phpredis"
+            - name: REDIS_HOST
+              value: {{ .Values.externalRedis.host | quote }}
+            - name: REDIS_PORT
+              value: {{ .Values.externalRedis.port | quote }}
+            - name: REDIS_PASSWORD
+              value: {{ .Values.externalRedis.password | quote }}
+            - name: REDIS_DB
+              value: {{ .Values.externalRedis.db | quote }}
+            - name: REDIS_CACHE_DB
+              value: {{ .Values.externalRedis.cacheDb | quote }}
+            - name: CACHE_STORE
+              value: "redis"
+            - name: QUEUE_CONNECTION
+              value: "redis"
+          resources:
+            {{ toYaml .Values.schedulerWorker.resources | nindent 12 }}
+{{- end }}
