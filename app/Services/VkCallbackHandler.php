@@ -2,13 +2,11 @@
 
 namespace App\Services;
 
-use Generator\Skeleton\skeleton\base\src\VK\CallbackApi\VKCallbackApiServerHandler;
 use Illuminate\Support\Facades\Log;
 use VK\Client\VKApiClient;
 
-class VkCallbackHandler extends VKCallbackApiServerHandler
+class VkCallbackHandler
 {
-
     /**
      * Обработка подтверждения сервера
      */
@@ -64,7 +62,7 @@ class VkCallbackHandler extends VKCallbackApiServerHandler
                 'random_id' => rand(1, 1000000),
             ]);
         } catch (\Exception $e) {
-            Log::error('VK Send Error: ' . $e->getMessage());
+            Log::error('VK Send Error: '.$e->getMessage());
         }
     }
 }
