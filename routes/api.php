@@ -2,7 +2,9 @@
 
 use App\Http\Controllers\Api\TextController;
 use App\Http\Controllers\Api\UserController;
+use App\Http\Controllers\Api\VkBotController;
 use App\OpenApi\Controllers\SwaggerController;
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Support\Facades\Route;
 
 require __DIR__.'/auth.php';
@@ -18,3 +20,7 @@ Route::get('/texts', [TextController::class, 'index']);
 Route::middleware('auth:sanctum')->group(function (): void {
     Route::get('profile', [UserController::class, 'profile']);
 });
+
+Route::post('/vk/callback', [VkBotController::class, 'handle'])
+    ->name('vk.callback');
+//    ->withoutMiddleware([VerifyCsrfToken::class]);

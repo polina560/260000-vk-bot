@@ -31,7 +31,7 @@
         "spatie/laravel-medialibrary": "^11.21",
         "symfony/http-foundation": "*",
         "visual-ideas/moonshine-spatie-medialibrary": "^4.1",
-        "vkcom/vk-php-sdk": "^5.80"
+        "vkcom/vk-php-sdk": "^5.131"
     },
     "require-dev": {
         "barryvdh/laravel-debugbar": "^4.0",
