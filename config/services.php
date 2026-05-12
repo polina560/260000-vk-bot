@@ -41,6 +41,7 @@ return [
         'version' => env('VK_API_VERSION', '5.199'),
         'group_id' => env('VK_GROUP_ID'),
         'secret' => env('VK_SECRET'),
+        'admin_id' => env('VK_ADMIN_ID'),
     ]
 
 ];
