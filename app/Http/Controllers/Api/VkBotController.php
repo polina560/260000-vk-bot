@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\VkCallbackHandler;
+use App\Services\VK\VkCallbackHandler;
 use Barryvdh\Debugbar\Facades\Debugbar;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -12,8 +12,8 @@ use VK\Client\VKApiClient;
 class VkBotController extends Controller
 {
     protected $handler;
-    protected $adminId;
 
+    protected $adminId;
 
     public function __construct(VkCallbackHandler $handler)
     {
@@ -49,7 +49,14 @@ class VkBotController extends Controller
 
         // Message
         if ($data && $data->type === 'message_new') {
-            $this->handleMessage($data);
+            $message = $data->object->message;
+            $this->handler->handleMessage(
+                $message->peer_id ?? null,
+                $message->from_id ?? null,
+                $message->text ?? '',
+                $message->payload ?? null,
+                $message->attachments ?? []
+            );
         }
 
         return 'ok';
@@ -65,88 +72,108 @@ class VkBotController extends Controller
         $peerId = $message->peer_id ?? null;
         $fromId = $message->from_id ?? null;
         $attachments = $message->attachments ?? [];
+        $payload = $message->payload ?? null;
+
+        $vk = new VKApiClient(config('services.vk.version', '5.199'));
+        $accessToken = config('services.vk.group_token');
+
+        if ($payload) {
+            $payloadData = json_decode($payload, true);
+
+            $command = $payloadData['command'] ?? $payloadData['answer'] ?? '';
+
+            switch ($command) {
+                case 'start':
+                    $vk->messages()->send($accessToken, [
+                        'peer_id' => $peerId,
+                        'message' => '👋 Привет! Я бот-помощник. Выберите действие:',
+//                        'keyboard' => $keyboard,
+                        'random_id' => random_int(1, 1000000)
+                    ]);
+                    break;
+            }
+        }
 
         // Проверяем, что сообщение не от администратора (избегаем зацикливания)
-//        if ($fromId == $this->adminId) {
-//            Log::info('Сообщение от администратора, не пересылаем');
-//            return;
-//        }
+        //        if ($fromId == $this->adminId) {
+        //            Log::info('Сообщение от администратора, не пересылаем');
+        //            return;
+        //        }
         // Получаем информацию о пользователе
-//        $userInfo = $this->getUserInfo($fromId);
+        $userInfo = $this->getUserInfo($fromId);
 
         // Формируем сообщение для администратора
-//        $adminMessage = $this->formatAdminMessage($userInfo, $text, $attachments);
-        $adminMessage = $this->formatAdminMessage($text, $attachments);
+        $adminMessage = $this->formatAdminMessage($userInfo, $text, $attachments);
+        //        $adminMessage = $this->formatAdminMessage($text, $attachments);
 
         // Отправляем сообщение администратору
         $this->sendMessageToAdmin($adminMessage, $attachments);
 
         // Отвечаем пользователю (опционально)
-//        $this->replyToUser($peerId, $fromId, $text);
+        //        $this->replyToUser($peerId, $fromId, $text);
     }
 
     /**
      * Получение информации о пользователе
      */
-//    protected function getUserInfo($userId)
-//    {
-//        try {
-//            $vk = new VKApiClient(config('services.vk.version', '5.199'));
-//            $accessToken = config('services.vk.group_token');
-//
-//            $user = $vk->users()->get($accessToken, [
-//                'user_ids' => [$userId],
-//                'fields' => ['first_name', 'last_name', 'screen_name', 'photo_50']
-//            ]);
-//
-//            if (!empty($user)) {
-//                return [
-//                    'id' => $userId,
-//                    'first_name' => $user[0]['first_name'] ?? 'Неизвестно',
-//                    'last_name' => $user[0]['last_name'] ?? '',
-//                    'screen_name' => $user[0]['screen_name'] ?? '',
-//                    'photo' => $user[0]['photo_50'] ?? '',
-//                    'link' => "https://vk.com/id{$userId}"
-//                ];
-//            }
-//        } catch (\Exception $e) {
-//            Log::error('Ошибка получения информации о пользователе: ' . $e->getMessage());
-//        }
-//
-//        return [
-//            'id' => $userId,
-//            'first_name' => 'Пользователь',
-//            'last_name' => '',
-//            'screen_name' => '',
-//            'link' => "https://vk.com/id{$userId}"
-//        ];
-//    }
+    protected function getUserInfo($userId)
+    {
+        try {
+            $vk = new VKApiClient(config('services.vk.version', '5.199'));
+            $accessToken = config('services.vk.group_token');
+
+            $user = $vk->users()->get($accessToken, [
+                'user_ids' => [$userId],
+                'fields' => ['first_name', 'last_name', 'screen_name', 'photo_50'],
+            ]);
+
+            if (!empty($user)) {
+                return [
+                    'id' => $userId,
+                    'first_name' => $user[0]['first_name'] ?? 'Неизвестно',
+                    'last_name' => $user[0]['last_name'] ?? '',
+                    'screen_name' => $user[0]['screen_name'] ?? '',
+                    'photo' => $user[0]['photo_50'] ?? '',
+                    'link' => "https://vk.com/id{$userId}",
+                ];
+            }
+        } catch (\Exception $e) {
+            Log::error('Ошибка получения информации о пользователе: '.$e->getMessage());
+        }
+
+        return [
+            'id' => $userId,
+            'first_name' => 'Пользователь',
+            'last_name' => '',
+            'screen_name' => '',
+            'link' => "https://vk.com/id{$userId}",
+        ];
+    }
 
     /**
      * Форматирование сообщения для администратора
      */
-//    protected function formatAdminMessage($userInfo, $text, $attachments)
-    protected function formatAdminMessage($text, $attachments)
+    protected function formatAdminMessage($userInfo, $text, $attachments)
     {
-        $message = "📨 **Новое сообщение от пользователя!**\n\n";
-//        $message .= "👤 **Пользователь:** {$userInfo['first_name']} {$userInfo['last_name']}\n";
-//        $message .= "🆔 **ID:** {$userInfo['id']}\n";
-//        $message .= "🔗 **Ссылка:** {$userInfo['link']}\n";
-//
-//        if (!empty($userInfo['screen_name'])) {
-//            $message .= "📝 **Screen name:** @{$userInfo['screen_name']}\n";
-//        }
+        $message = "📨 Новое сообщение от пользователя!\n\n";
+        $message .= "👤 Пользователь: {$userInfo['first_name']} {$userInfo['last_name']}\n";
+        //        $message .= "🆔 **ID:** {$userInfo['id']}\n";
+        $message .= "🔗 Ссылка: {$userInfo['link']}\n";
 
-        $message .= "\n💬 **Сообщение:**\n{$text}\n";
+        //        if (!empty($userInfo['screen_name'])) {
+        //            $message .= "📝 **Screen name:** @{$userInfo['screen_name']}\n";
+        //        }
+
+        $message .= "\n💬 Сообщение:\n {$text}\n";
 
         if (!empty($attachments)) {
-            $message .= "\n📎 **Вложения:** " . count($attachments) . " шт.\n";
+            $message .= "\n📎 Вложения: ".count($attachments)." шт.\n";
             foreach ($attachments as $attachment) {
                 $message .= "- Тип: {$attachment->type}\n";
             }
         }
 
-        $message .= "\n🕐 **Время:** " . date('d.m.Y H:i:s');
+        $message .= "\n🕐 Время: ".date('d.m.Y H:i:s');
 
         return $message;
     }
@@ -158,6 +185,7 @@ class VkBotController extends Controller
     {
         if (empty($this->adminId)) {
             Log::error('ID администратора не указан в конфигурации');
+
             return;
         }
 
@@ -193,40 +221,40 @@ class VkBotController extends Controller
             Log::info('Сообщение отправлено администратору', ['admin_id' => $this->adminId]);
 
         } catch (\Exception $e) {
-            Log::error('Ошибка отправки сообщения администратору: ' . $e->getMessage());
+            Log::error('Ошибка отправки сообщения администратору: '.$e->getMessage());
         }
     }
 
     /**
      * Ответ пользователю
      */
-//    protected function replyToUser($peerId, $userId, $userMessage)
-//    {
-//        try {
-//            $vk = new VKApiClient(config('services.vk.version', '5.199'));
-//            $accessToken = config('services.vk.group_token');
-//
-//            // Варианты ответов пользователю
-//            $responses = [
-//                "Спасибо за сообщение! Я передал его администратору. Ответ придет в ближайшее время.",
-//                "Ваше сообщение получено! Администратор скоро свяжется с вами.",
-//                "Сообщение доставлено администратору. Ожидайте ответа.",
-//                "Благодарю за обращение! Мы ответим вам в ближайшее время."
-//            ];
-//
-//            $reply = $responses[array_rand($responses)];
-//
-//            $vk->messages()->send($accessToken, [
-//                'peer_id' => $peerId,
-//                'message' => $reply,
-//                'random_id' => random_int(1, 1000000),
-//            ]);
-//
-//            Log::info('Ответ отправлен пользователю', ['user_id' => $userId]);
-//
-//        } catch (\Exception $e) {
-//            Log::error('Ошибка отправки ответа пользователю: ' . $e->getMessage());
-//        }
-//    }
+    //    protected function replyToUser($peerId, $userId, $userMessage)
+    //    {
+    //        try {
+    //            $vk = new VKApiClient(config('services.vk.version', '5.199'));
+    //            $accessToken = config('services.vk.group_token');
+    //
+    //            // Варианты ответов пользователю
+    //            $responses = [
+    //                "Спасибо за сообщение! Я передал его администратору. Ответ придет в ближайшее время.",
+    //                "Ваше сообщение получено! Администратор скоро свяжется с вами.",
+    //                "Сообщение доставлено администратору. Ожидайте ответа.",
+    //                "Благодарю за обращение! Мы ответим вам в ближайшее время."
+    //            ];
+    //
+    //            $reply = $responses[array_rand($responses)];
+    //
+    //            $vk->messages()->send($accessToken, [
+    //                'peer_id' => $peerId,
+    //                'message' => $reply,
+    //                'random_id' => random_int(1, 1000000),
+    //            ]);
+    //
+    //            Log::info('Ответ отправлен пользователю', ['user_id' => $userId]);
+    //
+    //        } catch (\Exception $e) {
+    //            Log::error('Ошибка отправки ответа пользователю: ' . $e->getMessage());
+    //        }
+    //    }
 
 }
