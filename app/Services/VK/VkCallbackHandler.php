@@ -2,6 +2,8 @@
 
 namespace App\Services\VK;
 
+use App\Enums\UserState;
+use App\Models\TelegramUser;
 use App\Services\VK\Commands\CommandFactory;
 use Illuminate\Support\Facades\Log;
 use VK\Client\VKApiClient;
@@ -46,6 +48,17 @@ class VkCallbackHandler
 //            return;
 //        }
 
+        $user = TelegramUser::firstOrCreate(
+            ['form_id' => $fromId],  // Первый параметр: условия поиска
+            [                         // Второй параметр: данные для создания
+                'name' => $this->getUserName($fromId),
+                'peer_id' => $peerId,
+                'state' => UserState::None->value,
+                'prev_state' => UserState::None->value,
+                'data' => []
+            ]
+        );
+
         // Обработка нажатий на кнопки (payload)
         if ($payload) {
             $payloadData = json_decode($payload, true);
@@ -59,6 +72,8 @@ class VkCallbackHandler
                 return;
             }
         }
+
+
 
 //        // Обработка текстовых команд
 //        $commandName = $this->parseCommand($text);
@@ -75,6 +90,27 @@ class VkCallbackHandler
 
         // Если не команда - пересылаем админу
 //        $this->forwardToAdmin($peerId, $fromId, $text, $attachments);
+    }
+
+    /**
+     * Получение имени пользователя по ID
+     */
+    private function getUserName($userId): string
+    {
+        try {
+            $user = $this->vk->users()->get($this->accessToken, [
+                'user_ids' => [$userId],
+                'fields' => ['first_name', 'last_name']
+            ]);
+
+            if (!empty($user)) {
+                return ($user[0]['first_name'] ?? '') . ' ' . ($user[0]['last_name'] ?? '');
+            }
+        } catch (\Exception $e) {
+            Log::error('Ошибка получения имени пользователя: ' . $e->getMessage());
+        }
+
+        return 'Пользователь';
     }
 
     /**

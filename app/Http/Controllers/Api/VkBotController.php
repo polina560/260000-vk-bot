@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\TelegramUser;
 use App\Services\VK\VkCallbackHandler;
 use Barryvdh\Debugbar\Facades\Debugbar;
 use Illuminate\Http\Request;
@@ -46,6 +47,8 @@ class VkBotController extends Controller
 
             return config('services.vk.confirm_string', '');
         }
+
+
 
         // Message
         if ($data && $data->type === 'message_new') {

@@ -2,9 +2,9 @@
     "_comment": "php artisan moonshine:build test.json",
     "resources": [
         {
-            "name": "Test",
-            "menuName": "Тесты",
-            "table": "test",
+            "name": "Telegram User",
+            "menuName": "Пользователи телеграм",
+            "table": "telegram_user",
             "timestamps": true,
 
             "withMigration": true,
@@ -18,28 +18,24 @@
                     "methods": ["sortable"]
                 },
                 {
-                    "column": "title",
-                    "type": "string"
-                },
-                {
-                    "column": "image",
+                    "column": "name",
                     "type": "string",
-                    "nullable": true,
-                    "field": "Image"
+                    "nullable": true
                 },
                 {
-                    "column": "discount",
-                    "type": "decimal",
-                    "default": 0.0,
-                    "nullable": true,
-                    "hasFilter": true
+                    "column": "peer_id",
+                    "type": "string",
+                    "nullable": true
                 },
                 {
-                    "column": "user_id",
-                    "type": "BelongsTo",
-                    "relation": {
-                        "table" : "users"
-                    }
+                    "column": "form_id",
+                    "type": "string",
+                    "nullable": true
+                },
+                {
+                    "column": "state",
+                    "type": "integer",
+                    "default": 0
                 }
             ]
         }

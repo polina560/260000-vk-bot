@@ -2,52 +2,77 @@
 
 namespace App\Services\VK\Commands;
 
+use App\Enums\UserState;
+use App\Models\TelegramUser;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Cache;
 use VK\Client\VKApiClient;
 
 class DelayCommand extends BaseCommand
 {
-    // Ключи для хранения состояний в кэше
-    private const STATE_KEY = 'vk_user_state_';
-    private const USER_DATA_KEY = 'vk_user_data_';
-
     public function execute(): void
     {
         $telegram_id = $this->fromId;
         $chat_id = $this->peerId;
         $text = trim($this->payload['text'] ?? '');
 
-        // Получаем текущее состояние пользователя
-        $state = $this->getUserState($telegram_id);
-        $data = $this->getUserData($telegram_id);
+        // Получаем или создаем пользователя
+        $user = TelegramUser::firstOrCreate(
+            ['form_id' => $telegram_id],
+            [
+                'name' => $this->getUserName(),
+                'peer_id' => $chat_id,
+                'state' => UserState::None->value,
+                'prev_state' => UserState::None->value,
+                'data' => []
+            ]
+        );
+
+        // Обновляем peer_id если изменился
+        if ($user->peer_id != $chat_id) {
+            $user->peer_id = $chat_id;
+        }
+
+        $state = $user->state;
+        $prevState = $user->prev_state;
+        $data = $user->getUserData();
+
+        Log::info('DelayCommand', [
+            'user_id' => $telegram_id,
+            'state' => $state,
+            'prev_state' => $prevState,
+            'text' => $text,
+            'data' => $data
+        ]);
 
         // Обработка команды "Главное меню"
         if (mb_strtolower($text) === 'главное меню') {
-            $this->clearUserState($telegram_id);
+            $user->state = UserState::None->value;
+            $user->prev_state = UserState::None->value;
+            $user->data = null;
+            $user->save();
             $this->showMainMenu($chat_id);
             return;
         }
 
         // Обработка кнопки "Назад"
         if (mb_strtolower($text) === 'назад') {
-            $prevState = $data['prev_state'] ?? null;
-
-            if ($prevState === 'wait_reason') {
-                $this->setUserState($telegram_id, 'wait_reason', $data);
+            if ($prevState === UserState::WaitReason->value) {
+                $user->state = UserState::WaitReason->value;
+                $user->save();
                 $this->sendMessageWithKeyboard(
                     $chat_id,
-                    "Укажи причину опоздания:",
+                    "📝 Укажи причину опоздания:",
                     $this->getBackKeyboard()
                 );
                 return;
             }
 
-            if ($prevState === 'wait_time') {
-                $this->setUserState($telegram_id, 'wait_time', $data);
+            if ($prevState === UserState::WaitTime->value) {
+                $user->state = UserState::WaitTime->value;
+                $user->save();
                 $this->sendMessageWithKeyboard(
                     $chat_id,
-                    'Укажи на сколько минут ты опаздываешь:',
+                    '⏰ Укажи на сколько минут ты опаздываешь:',
                     $this->getTimeKeyboard()
                 );
                 return;
@@ -56,24 +81,28 @@ class DelayCommand extends BaseCommand
 
         // Обработка в зависимости от состояния
         switch ($state) {
-            case 'wait_reason':
-                $this->handleWaitReason($chat_id, $telegram_id, $text, $data);
+            case UserState::WaitReason->value:
+                $this->handleWaitReason($user, $text, $data);
                 break;
 
-            case 'wait_time':
-                $this->handleWaitTime($chat_id, $telegram_id, $text, $data);
+            case UserState::WaitTime->value:
+                $this->handleWaitTime($user, $text, $data);
                 break;
 
-            case 'confirm':
-                $this->handleConfirm($chat_id, $telegram_id, $text, $data);
+            case UserState::Confirm->value:
+                $this->handleConfirm($user, $text, $data);
                 break;
 
             default:
                 // Начало процесса - запрос времени опоздания
-                $this->setUserState($telegram_id, 'wait_time', []);
+                $user->state = UserState::WaitTime->value;
+                $user->prev_state = UserState::None->value;
+                $user->data = [];
+                $user->save();
+
                 $this->sendMessageWithKeyboard(
                     $chat_id,
-                    'Укажи на сколько минут ты опаздываешь:',
+                    '⏰ Укажи на сколько минут ты опаздываешь:',
                     $this->getTimeKeyboard()
                 );
                 break;
@@ -81,27 +110,50 @@ class DelayCommand extends BaseCommand
     }
 
     /**
+     * Получение имени пользователя
+     */
+    private function getUserName(): string
+    {
+        $userInfo = $this->getUserInfo();
+        return ($userInfo['first_name'] ?? 'Пользователь') . ' ' . ($userInfo['last_name'] ?? '');
+    }
+
+    /**
      * Обработка ввода причины опоздания
      */
-    private function handleWaitReason($chat_id, $telegram_id, $text, $data): void
+    private function handleWaitReason(TelegramUser $user, string $text, array $data): void
     {
+        $chat_id = $user->peer_id;
+
+        if (empty($text)) {
+            $this->sendMessageWithKeyboard(
+                $chat_id,
+                "❌ Пожалуйста, напиши причину опоздания:",
+                $this->getBackKeyboard()
+            );
+            return;
+        }
+
         if (strlen($text) > 150) {
             $this->sendMessageWithKeyboard(
                 $chat_id,
-                "Ошибка! Укажи более краткую причину опоздания:",
+                "❌ Ошибка! Укажи более краткую причину опоздания (до 150 символов):",
                 $this->getBackKeyboard()
             );
             return;
         }
 
         $data['reason'] = $text;
-        $data['prev_state'] = 'wait_reason';
-        $this->setUserState($telegram_id, 'confirm', $data);
 
-        $reply = "Проверь информацию: \n";
-        $reply .= "Опоздание: " . ($data['delay_minutes'] ?? '?') . " мин\n";
-        $reply .= "Причина: " . $data['reason'] . "\n";
-        $reply .= "Все верно? Напиши 'Да' или 'Исправить'";
+        $user->prev_state = UserState::WaitReason->value;
+        $user->state = UserState::Confirm->value;
+        $user->data = $data;
+        $user->save();
+
+        $reply = "📋 *Проверь информацию:*\n\n";
+        $reply .= "⏰ Опоздание: " . ($data['delay_minutes'] ?? '?') . " мин\n";
+        $reply .= "📝 Причина: " . $data['reason'] . "\n\n";
+        $reply .= "✅ Все верно? Напиши 'Да' или 'Исправить'";
 
         $this->sendMessageWithKeyboard(
             $chat_id,
@@ -113,13 +165,15 @@ class DelayCommand extends BaseCommand
     /**
      * Обработка ввода времени опоздания
      */
-    private function handleWaitTime($chat_id, $telegram_id, $text, $data): void
+    private function handleWaitTime(TelegramUser $user, string $text, array $data): void
     {
+        $chat_id = $user->peer_id;
+
         // Проверка на числовое значение
         if (!is_numeric($text)) {
             $this->sendMessageWithKeyboard(
                 $chat_id,
-                "Ошибка! Укажи время опоздания в минутах числом:",
+                "❌ Ошибка! Укажи время опоздания в минутах числом (например: 15):",
                 $this->getTimeKeyboard()
             );
             return;
@@ -130,19 +184,22 @@ class DelayCommand extends BaseCommand
         if ($minutes < 1 || $minutes > 999) {
             $this->sendMessageWithKeyboard(
                 $chat_id,
-                "Ошибка! Укажи число не большее 999 минут:",
+                "❌ Ошибка! Укажи число от 1 до 999 минут:",
                 $this->getTimeKeyboard()
             );
             return;
         }
 
         $data['delay_minutes'] = $minutes;
-        $data['prev_state'] = 'wait_time';
-        $this->setUserState($telegram_id, 'wait_reason', $data);
+
+        $user->prev_state = UserState::WaitTime->value;
+        $user->state = UserState::WaitReason->value;
+        $user->data = $data;
+        $user->save();
 
         $this->sendMessageWithKeyboard(
             $chat_id,
-            "Укажи причину опоздания:",
+            "📝 Укажи причину опоздания:",
             $this->getBackKeyboard()
         );
     }
@@ -150,8 +207,10 @@ class DelayCommand extends BaseCommand
     /**
      * Обработка подтверждения
      */
-    private function handleConfirm($chat_id, $telegram_id, $text, $data): void
+    private function handleConfirm(TelegramUser $user, string $text, array $data): void
     {
+        $chat_id = $user->peer_id;
+        $telegram_id = $user->form_id;
         $textLower = mb_strtolower(trim($text));
 
         if ($textLower === 'да') {
@@ -161,37 +220,51 @@ class DelayCommand extends BaseCommand
             $username = $userInfo['screen_name'] ?: ('id' . $telegram_id);
 
             // Формируем сообщение для администратора
-            $msg = "🚨 *Опоздание*\n";
-            $msg .= $customName . " (@" . $username . ")\n";
-            $msg .= "Опоздание на: `" . $data['delay_minutes'] . " мин`\n";
-            $msg .= "Комментарий: `" . $data['reason'] . "`\n";
+            $msg = "🚨 *НОВОЕ ОПОЗДАНИЕ*\n\n";
+            $msg .= "👤 Сотрудник: {$customName}\n";
+            $msg .= "📱 Username: @{$username}\n";
+            $msg .= "⏰ Опоздание: `{$data['delay_minutes']} мин`\n";
+            $msg .= "📝 Причина: `{$data['reason']}`\n";
+            $msg .= "🕐 Время: " . date('d.m.Y H:i:s');
 
             // Отправляем администратору
             $this->sendToAdminWithMarkdown($msg);
 
-            // Сохраняем в базу данных (если есть)
-            $this->saveToDatabase($telegram_id, $customName, $data);
+            // Сохраняем в лог
+            Log::info('Запись об опоздании', [
+                'user_id' => $telegram_id,
+                'custom_name' => $customName,
+                'delay_minutes' => $data['delay_minutes'],
+                'reason' => $data['reason']
+            ]);
 
             // Очищаем состояние пользователя
-            $this->clearUserState($telegram_id);
+            $user->state = UserState::None->value;
+            $user->prev_state = UserState::None->value;
+            $user->data = null;
+            $user->save();
 
             // Отправляем подтверждение пользователю
-            $this->sendMessage($chat_id, "Готово! Информация передана руководству");
+            $this->sendMessage($chat_id, "✅ Готово! Информация об опоздании передана руководству.");
 
             // Показываем главное меню
             $this->showMainMenu($chat_id);
 
         } elseif ($textLower === 'исправить') {
-            $this->setUserState($telegram_id, 'wait_time', $data);
+            $user->state = UserState::WaitTime->value;
+            $user->prev_state = UserState::None->value;
+            $user->data = [];
+            $user->save();
+
             $this->sendMessageWithKeyboard(
                 $chat_id,
-                "Начнем заново. Укажи на сколько минут ты опаздываешь:",
+                "🔄 Начнем заново. Укажи на сколько минут ты опаздываешь:",
                 $this->getTimeKeyboard()
             );
         } else {
             $this->sendMessageWithKeyboard(
                 $chat_id,
-                "Напиши 'Да' для подтверждения или 'Исправить', чтобы внести исправления.",
+                "❓ Напиши 'Да' для подтверждения или 'Исправить', чтобы внести исправления.",
                 $this->getConfirmKeyboard()
             );
         }
@@ -214,26 +287,11 @@ class DelayCommand extends BaseCommand
                 'peer_id' => $adminId,
                 'message' => $message,
                 'random_id' => random_int(1, 1000000),
-                'parse_mode' => 'markdown' // В VK поддерживается markdown
+                'parse_mode' => 'markdown'
             ]);
         } catch (\Exception $e) {
             Log::error('Ошибка отправки сообщения админу: ' . $e->getMessage());
         }
-    }
-
-    /**
-     * Сохранение в базу данных
-     */
-    private function saveToDatabase($userId, $customName, $data): void
-    {
-        // Если у вас есть подключение к БД
-        // Здесь можно сохранить информацию в таблицу user_event_log
-        Log::info('Запись об опоздании', [
-            'user_id' => $userId,
-            'custom_name' => $customName,
-            'delay_minutes' => $data['delay_minutes'],
-            'reason' => $data['reason']
-        ]);
     }
 
     /**
@@ -282,6 +340,16 @@ class DelayCommand extends BaseCommand
                     [
                         'action' => [
                             'type' => 'text',
+                            'label' => '✏️ Своё значение',
+                            'payload' => json_encode(['command' => 'delay', 'text' => 'custom'])
+                        ],
+                        'color' => 'secondary'
+                    ]
+                ],
+                [
+                    [
+                        'action' => [
+                            'type' => 'text',
                             'label' => '◀️ Назад',
                             'payload' => json_encode(['command' => 'delay', 'text' => 'назад'])
                         ],
@@ -291,7 +359,7 @@ class DelayCommand extends BaseCommand
                         'action' => [
                             'type' => 'text',
                             'label' => '🏠 Главное меню',
-                            'payload' => json_encode(['command' => 'delay', 'text' => 'главное меню'])
+                            'payload' => json_encode(['command' => 'start'])
                         ],
                         'color' => 'secondary'
                     ]
@@ -323,7 +391,7 @@ class DelayCommand extends BaseCommand
                         'action' => [
                             'type' => 'text',
                             'label' => '🏠 Главное меню',
-                            'payload' => json_encode(['command' => 'delay', 'text' => 'главное меню'])
+                            'payload' => json_encode(['command' => 'start'])
                         ],
                         'color' => 'secondary'
                     ]
@@ -365,7 +433,7 @@ class DelayCommand extends BaseCommand
                         'action' => [
                             'type' => 'text',
                             'label' => '🏠 Главное меню',
-                            'payload' => json_encode(['command' => 'delay', 'text' => 'главное меню'])
+                            'payload' => json_encode(['command' => 'start'])
                         ],
                         'color' => 'secondary'
                     ]
@@ -383,41 +451,5 @@ class DelayCommand extends BaseCommand
     private function sendMessageWithKeyboard($chat_id, $message, $keyboard): void
     {
         $this->sendMessage($message, $keyboard);
-    }
-
-    /**
-     * Получение состояния пользователя из кэша
-     */
-    private function getUserState($userId): ?string
-    {
-        return Cache::get(self::STATE_KEY . $userId);
-    }
-
-    /**
-     * Получение данных пользователя из кэша
-     */
-    private function getUserData($userId): array
-    {
-        return Cache::get(self::USER_DATA_KEY . $userId, []);
-    }
-
-    /**
-     * Установка состояния пользователя
-     */
-    private function setUserState($userId, $state, $data = []): void
-    {
-        Cache::put(self::STATE_KEY . $userId, $state, now()->addHours(1));
-        if (!empty($data)) {
-            Cache::put(self::USER_DATA_KEY . $userId, $data, now()->addHours(1));
-        }
-    }
-
-    /**
-     * Очистка состояния пользователя
-     */
-    private function clearUserState($userId): void
-    {
-        Cache::forget(self::STATE_KEY . $userId);
-        Cache::forget(self::USER_DATA_KEY . $userId);
     }
 }
