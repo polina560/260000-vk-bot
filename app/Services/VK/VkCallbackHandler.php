@@ -58,6 +58,24 @@ class VkCallbackHandler
                 'data' => []
             ]
         );
+        $currentState = $user ? $user->state : UserState::None->value;
+
+
+        if ($currentState !== UserState::None->value && !$payload) {
+            Log::info('Продолжение диалога', ['state' => $currentState]);
+
+            // Определяем текущую команду по состоянию
+            $command = $this->getCommandByState($currentState);
+
+            if ($command) {
+                $commandInstance = $this->commandFactory->make($command, $peerId, $fromId, ['text' => $text]);
+                if ($commandInstance) {
+                    $commandInstance->execute();
+                    return;
+                }
+            }
+        }
+
 
         // Обработка нажатий на кнопки (payload)
         if ($payload) {
@@ -90,6 +108,18 @@ class VkCallbackHandler
 
         // Если не команда - пересылаем админу
 //        $this->forwardToAdmin($peerId, $fromId, $text, $attachments);
+    }
+
+    /**
+     * Определение команды по состоянию пользователя
+     */
+    private function getCommandByState(int $state): ?string
+    {
+        // Здесь нужно определить, какая команда активна
+        // Поскольку у нас одна команда DelayCommand, возвращаем 'delay'
+        // Если будет несколько команд с состояниями, нужно хранить в БД название активной команды
+
+        return 'delay';
     }
 
     /**
