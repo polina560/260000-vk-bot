@@ -74,7 +74,7 @@ class VkCallbackHandler
 //        }
 
         // Если не команда - пересылаем админу
-        $this->forwardToAdmin($peerId, $fromId, $text, $attachments);
+//        $this->forwardToAdmin($peerId, $fromId, $text, $attachments);
     }
 
     /**
