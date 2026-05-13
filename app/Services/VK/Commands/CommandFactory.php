@@ -12,10 +12,12 @@ class CommandFactory
 
     private array $commands = [
         'start' => StartCommand::class,
-//        'help' => HelpCommand::class,
-//        'about' => AboutCommand::class,
-//        'support' => SupportCommand::class,
-//        'tenders' => TendersCommand::class, // Добавьте свой класс
+        'delay' => DelayCommand::class,        // Опоздание
+        'sick' => SickCommand::class,          // Заболел
+        'return-sick' => ReturnSickCommand::class,  // Выхожу с больничного
+        'schedule' => ScheduleCommand::class,  // Изменения в расписании
+        'force-majeure' => ForceMajeureCommand::class, // Форс-мажор
+        'other' => OtherCommand::class,        // Другое
     ];
 
     public function __construct(VKApiClient $vk, string $accessToken)
