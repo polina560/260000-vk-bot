@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Resources\TelegramUser\Pages;
 
+use App\Enums\CommandType;
+use App\Enums\UserState;
 use MoonShine\Laravel\Pages\Crud\FormPage;
 use MoonShine\Contracts\UI\ComponentContract;
 use MoonShine\Contracts\UI\FormBuilderContract;
@@ -12,6 +14,7 @@ use MoonShine\Contracts\UI\FieldContract;
 use MoonShine\Contracts\Core\TypeCasts\DataWrapperContract;
 use App\MoonShine\Resources\TelegramUser\TelegramUserResource;
 use MoonShine\Support\ListOf;
+use MoonShine\UI\Fields\Enum;
 use Throwable;
 use MoonShine\UI\Fields\ID;
 use MoonShine\UI\Fields\Text;
@@ -33,8 +36,10 @@ class TelegramUserFormPage extends FormPage
 			Text::make('Name', 'name'),
 			Text::make('PeerId', 'peer_id'),
 			Text::make('FormId', 'form_id'),
-			Number::make('State', 'state')
-				->default(0),
+            Enum::make('State', 'state')
+                ->attach(UserState::class),
+            Enum::make('Command', 'command')
+                ->attach(CommandType::class)
         ];
     }
 

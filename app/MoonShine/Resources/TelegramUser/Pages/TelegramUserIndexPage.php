@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MoonShine\Resources\TelegramUser\Pages;
 
+use App\Enums\CommandType;
 use App\Enums\UserState;
 use MoonShine\Laravel\Pages\Crud\IndexPage;
 use MoonShine\Contracts\UI\ComponentContract;
@@ -38,7 +39,9 @@ class TelegramUserIndexPage extends IndexPage
 			Text::make('PeerId', 'peer_id'),
 			Text::make('FormId', 'form_id'),
 			Enum::make('State', 'state')
-                ->attach(UserState::class)
+                ->attach(UserState::class),
+            Enum::make('Command', 'command')
+                ->attach(CommandType::class)
         ];
     }
 

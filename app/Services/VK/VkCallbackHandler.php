@@ -2,6 +2,7 @@
 
 namespace App\Services\VK;
 
+use App\Enums\CommandType;
 use App\Enums\UserState;
 use App\Models\TelegramUser;
 use App\Services\VK\Commands\CommandFactory;
@@ -55,20 +56,47 @@ class VkCallbackHandler
                 'peer_id' => $peerId,
                 'state' => UserState::None->value,
                 'prev_state' => UserState::None->value,
+                'command' => CommandType::Start->value,
                 'data' => []
             ]
         );
-        $currentState = $user ? $user->state : UserState::None->value;
 
+        $currentState = $user->state;
+        $currentCommand = $user->command;
 
-        if ($currentState !== UserState::None->value && !$payload) {
-            Log::info('Продолжение диалога', ['state' => $currentState]);
+        $isPayloadEmpty = empty($payload) || $payload === '{}' || $payload === '""';
 
-            // Определяем текущую команду по состоянию
-            $command = $this->getCommandByState($currentState);
+        // Если есть активное состояние (не None) И это не нажатие кнопки (или пустой payload)
+        if ($currentState !== UserState::None->value && $isPayloadEmpty) {
+            Log::info('Продолжение диалога', [
+                'state' => $currentState,
+                'command' => $user->command,
+                'text' => $text
+            ]);
 
-            if ($command) {
-                $commandInstance = $this->commandFactory->make($command, $peerId, $fromId, ['text' => $text]);
+            if ($currentCommand && $currentCommand !== CommandType::None->value) {
+                $commandInstance = $this->commandFactory->make(
+                    $currentCommand,  // Используем команду из БД
+                    $peerId,
+                    $fromId,
+                    ['text' => $text]
+                );
+                if ($commandInstance) {
+                    $commandInstance->execute();
+                    return;
+                }
+            }
+
+            // ✅ Если команда не найдена, но есть состояние - пробуем определить команду
+            $commandByState = $this->getCommandByState($currentState);
+            if ($commandByState) {
+                Log::info('Команда определена по состоянию', ['command' => $commandByState]);
+                $commandInstance = $this->commandFactory->make(
+                    $commandByState,
+                    $peerId,
+                    $fromId,
+                    ['text' => $text]
+                );
                 if ($commandInstance) {
                     $commandInstance->execute();
                     return;
@@ -92,11 +120,34 @@ class VkCallbackHandler
         }
 
 
+        if ($currentState !== UserState::None->value) {
+            Log::info('Активное состояние, но не обработано ранее', [
+                'state' => $currentState,
+                'command' => $currentCommand
+            ]);
+
+            // Пробуем получить команду по состоянию
+            $commandByState = $this->getCommandByState($currentState);
+            if ($commandByState) {
+                $commandInstance = $this->commandFactory->make(
+                    $commandByState,
+                    $peerId,
+                    $fromId,
+                    ['text' => $text]
+                );
+                if ($commandInstance) {
+                    $commandInstance->execute();
+                    return;
+                }
+            }
+        }
+
+        // Если ничего не подошло - показываем стартовое меню
+        Log::info('Показываем стартовое меню');
         $startCommand = $this->commandFactory->make('start', $peerId, $fromId, null);
         if ($startCommand) {
             $startCommand->execute();
         }
-
 //        // Обработка текстовых команд
 //        $commandName = $this->parseCommand($text);
 //

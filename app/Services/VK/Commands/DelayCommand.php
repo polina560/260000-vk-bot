@@ -2,10 +2,10 @@
 
 namespace App\Services\VK\Commands;
 
+use App\Enums\CommandType;
 use App\Enums\UserState;
 use App\Models\TelegramUser;
 use Illuminate\Support\Facades\Log;
-use VK\Client\VKApiClient;
 
 class DelayCommand extends BaseCommand
 {
@@ -22,16 +22,18 @@ class DelayCommand extends BaseCommand
                 'name' => $this->getUserName(),
                 'peer_id' => $chat_id,
                 'state' => UserState::None->value,
+                'command' => CommandType::Delay->value,
                 'prev_state' => UserState::None->value,
-                'data' => []
+                'data' => [],
             ]
         );
 
+        $user->command = CommandType::Delay->value;
         // Обновляем peer_id если изменился
         if ($user->peer_id != $chat_id) {
             $user->peer_id = $chat_id;
-            $user->save();
         }
+        $user->save();
 
         $state = $user->state;
         $prevState = $user->prev_state;
@@ -42,22 +44,24 @@ class DelayCommand extends BaseCommand
             'state' => $state,
             'prev_state' => $prevState,
             'text' => $text,
-            'data' => $data
+            'data' => $data,
         ]);
 
         // Обработка команды "Главное меню"
         if (mb_strtolower($text) === 'главное меню') {
+            $user->command = CommandType::None->value;
             $user->state = UserState::None->value;
             $user->prev_state = UserState::None->value;
             $user->data = null;
             $user->save();
-//            $this->showMainMenu($chat_id);
+            //            $this->showMainMenu($chat_id);
 
             $this->sendMessage(
                 'Главное меню',
                 $this->getKeyboardStart(),
                 $chat_id
             );
+
             return;
         }
 
@@ -68,10 +72,11 @@ class DelayCommand extends BaseCommand
                 $user->prev_state = UserState::WaitTime->value;
                 $user->save();
                 $this->sendMessage(
-                    "📝 Укажи причину опоздания:",
+                    '📝 Укажи причину опоздания:',
                     $this->getBackKeyboard(),
                     $chat_id
                 );
+
                 return;
             }
 
@@ -84,6 +89,7 @@ class DelayCommand extends BaseCommand
                     $this->getTimeKeyboard(),
                     $chat_id
                 );
+
                 return;
             }
         }
@@ -124,6 +130,7 @@ class DelayCommand extends BaseCommand
     private function getUserName(): string
     {
         $userInfo = $this->getUserInfo();
+
         return ($userInfo['first_name'] ?? 'Пользователь') . ' ' . ($userInfo['last_name'] ?? '');
     }
 
@@ -136,19 +143,21 @@ class DelayCommand extends BaseCommand
 
         if (empty($text)) {
             $this->sendMessage(
-                "❌ Пожалуйста, напиши причину опоздания:",
+                '❌ Пожалуйста, напиши причину опоздания:',
                 $this->getBackKeyboard(),
                 $chat_id
             );
+
             return;
         }
 
         if (strlen($text) > 150) {
             $this->sendMessage(
-                "❌ Ошибка! Укажи более краткую причину опоздания (до 150 символов):",
+                '❌ Ошибка! Укажи более краткую причину опоздания (до 150 символов):',
                 $this->getBackKeyboard(),
                 $chat_id
             );
+
             return;
         }
 
@@ -159,9 +168,9 @@ class DelayCommand extends BaseCommand
         $user->data = $data;
         $user->save();
 
-        $reply = "📋 *Проверь информацию:*\n\n";
-        $reply .= "⏰ Опоздание: " . ($data['delay_minutes'] ?? '?') . " мин\n";
-        $reply .= "📝 Причина: " . $data['reason'] . "\n\n";
+        $reply = "📋 Проверь информацию: \n\n";
+        $reply .= '⏰ Опоздание: ' . ($data['delay_minutes'] ?? '?') . " мин\n";
+        $reply .= '📝 Причина: ' . $data['reason'] . "\n\n";
         $reply .= "✅ Все верно? Напиши 'Да' или 'Исправить'";
 
         $this->sendMessage(
@@ -181,10 +190,11 @@ class DelayCommand extends BaseCommand
         // Проверка на числовое значение
         if (!is_numeric($text)) {
             $this->sendMessage(
-                "❌ Ошибка! Укажи время опоздания в минутах числом (например: 15):",
+                '❌ Ошибка! Укажи время опоздания в минутах числом (например: 15):',
                 $this->getTimeKeyboard(),
                 $chat_id
             );
+
             return;
         }
 
@@ -192,10 +202,11 @@ class DelayCommand extends BaseCommand
 
         if ($minutes < 1 || $minutes > 999) {
             $this->sendMessage(
-                "❌ Ошибка! Укажи число от 1 до 999 минут:",
+                '❌ Ошибка! Укажи число от 1 до 999 минут:',
                 $this->getTimeKeyboard(),
                 $chat_id
             );
+
             return;
         }
 
@@ -207,7 +218,7 @@ class DelayCommand extends BaseCommand
         $user->save();
 
         $this->sendMessage(
-            "📝 Укажи причину опоздания:",
+            '📝 Укажи причину опоздания:',
             $this->getBackKeyboard(),
             $chat_id
         );
@@ -234,7 +245,7 @@ class DelayCommand extends BaseCommand
             $msg .= "📱 Username: @{$username}\n";
             $msg .= "⏰ Опоздание: `{$data['delay_minutes']} мин`\n";
             $msg .= "📝 Причина: `{$data['reason']}`\n";
-            $msg .= "🕐 Время: " . date('d.m.Y H:i:s');
+            $msg .= '🕐 Время: ' . date('d.m.Y H:i:s');
 
             // Отправляем администратору
             $this->sendToAdminWithMarkdown($msg);
@@ -244,26 +255,19 @@ class DelayCommand extends BaseCommand
                 'user_id' => $telegram_id,
                 'custom_name' => $customName,
                 'delay_minutes' => $data['delay_minutes'],
-                'reason' => $data['reason']
+                'reason' => $data['reason'],
             ]);
 
             // Очищаем состояние пользователя
+            $user->command = CommandType::None->value;
             $user->state = UserState::None->value;
             $user->prev_state = UserState::None->value;
             $user->data = null;
             $user->save();
 
-            // Отправляем подтверждение пользователю
-//            $this->sendMessage($chat_id, "✅ Готово! Информация об опоздании передана руководству.");
-//            $this->vk->messages()->send($this->accessToken, [
-//                'peer_id' => $user->peer_id,
-//                'message' => "✅ Готово! Информация об опоздании передана руководству.",
-//                'random_id' => random_int(1, 1000000),
-//                'parse_mode' => 'markdown'
-//            ]);
-
             // Показываем главное меню
-            $this->sendMessage("✅ Готово! Информация об опоздании передана руководству.", $this->getKeyboardStart(), $chat_id);
+            $this->sendMessage('✅ Готово! Информация об опоздании передана руководству.', $this->getKeyboardStart(), $chat_id);
+
             return;
 
         } elseif ($textLower === 'исправить') {
@@ -273,10 +277,11 @@ class DelayCommand extends BaseCommand
             $user->save();
 
             $this->sendMessage(
-                "🔄 Начнем заново. Укажи на сколько минут ты опаздываешь:",
+                '🔄 Начнем заново. Укажи на сколько минут ты опаздываешь:',
                 $this->getTimeKeyboard(),
                 $chat_id
             );
+
             return;
         } else {
             $this->sendMessage(
@@ -284,6 +289,7 @@ class DelayCommand extends BaseCommand
                 $this->getConfirmKeyboard(),
                 $chat_id
             );
+
             return;
         }
     }
@@ -297,6 +303,7 @@ class DelayCommand extends BaseCommand
 
         if (!$adminId) {
             Log::error('ID администратора не указан');
+
             return;
         }
 
@@ -305,13 +312,12 @@ class DelayCommand extends BaseCommand
                 'peer_id' => $adminId,
                 'message' => $message,
                 'random_id' => random_int(1, 1000000),
-                'parse_mode' => 'markdown'
+                'parse_mode' => 'markdown',
             ]);
         } catch (\Exception $e) {
             Log::error('Ошибка отправки сообщения админу: ' . $e->getMessage());
         }
     }
-
 
     /**
      * Клавиатура с вариантами времени
@@ -325,57 +331,57 @@ class DelayCommand extends BaseCommand
                         'action' => [
                             'type' => 'text',
                             'label' => '10',
-                            'payload' => json_encode(['command' => 'delay', 'text' => '10'])
+                            'payload' => json_encode(['command' => 'delay', 'text' => '10']),
                         ],
-                        'color' => 'primary'
+                        'color' => 'primary',
                     ],
                     [
                         'action' => [
                             'type' => 'text',
                             'label' => '15',
-                            'payload' => json_encode(['command' => 'delay', 'text' => '15'])
+                            'payload' => json_encode(['command' => 'delay', 'text' => '15']),
                         ],
-                        'color' => 'primary'
+                        'color' => 'primary',
                     ],
                     [
                         'action' => [
                             'type' => 'text',
                             'label' => '30',
-                            'payload' => json_encode(['command' => 'delay', 'text' => '30'])
+                            'payload' => json_encode(['command' => 'delay', 'text' => '30']),
                         ],
-                        'color' => 'primary'
-                    ]
+                        'color' => 'primary',
+                    ],
                 ],
                 [
                     [
                         'action' => [
                             'type' => 'text',
                             'label' => '✏️ Своё значение',
-                            'payload' => json_encode(['command' => 'delay', 'text' => 'custom'])
+                            'payload' => json_encode(['command' => 'delay', 'text' => 'custom']),
                         ],
-                        'color' => 'secondary'
-                    ]
+                        'color' => 'secondary',
+                    ],
                 ],
                 [
                     [
                         'action' => [
                             'type' => 'text',
                             'label' => '◀️ Назад',
-                            'payload' => json_encode(['command' => 'delay', 'text' => 'назад'])
+                            'payload' => json_encode(['command' => 'delay', 'text' => 'назад']),
                         ],
-                        'color' => 'secondary'
+                        'color' => 'secondary',
                     ],
                     [
                         'action' => [
                             'type' => 'text',
                             'label' => '🏠 Главное меню',
-                            'payload' => json_encode(['command' => 'start'])
+                            'payload' => json_encode(['command' => 'start']),
                         ],
-                        'color' => 'secondary'
-                    ]
-                ]
+                        'color' => 'secondary',
+                    ],
+                ],
             ],
-            'one_time' => false
+            'one_time' => false,
         ];
 
         return json_encode($keyboard, JSON_UNESCAPED_UNICODE);
@@ -393,21 +399,21 @@ class DelayCommand extends BaseCommand
                         'action' => [
                             'type' => 'text',
                             'label' => '◀️ Назад',
-                            'payload' => json_encode(['command' => 'delay', 'text' => 'назад'])
+                            'payload' => json_encode(['command' => 'delay', 'text' => 'назад']),
                         ],
-                        'color' => 'secondary'
+                        'color' => 'secondary',
                     ],
                     [
                         'action' => [
                             'type' => 'text',
                             'label' => '🏠 Главное меню',
-                            'payload' => json_encode(['command' => 'start'])
+                            'payload' => json_encode(['command' => 'start']),
                         ],
-                        'color' => 'secondary'
-                    ]
-                ]
+                        'color' => 'secondary',
+                    ],
+                ],
             ],
-            'one_time' => false
+            'one_time' => false,
         ];
 
         return json_encode($keyboard, JSON_UNESCAPED_UNICODE);
@@ -425,31 +431,31 @@ class DelayCommand extends BaseCommand
                         'action' => [
                             'type' => 'text',
                             'label' => '✅ Да',
-                            'payload' => json_encode(['command' => 'delay', 'text' => 'да'])
+                            'payload' => json_encode(['command' => 'delay', 'text' => 'да']),
                         ],
-                        'color' => 'positive'
+                        'color' => 'positive',
                     ],
                     [
                         'action' => [
                             'type' => 'text',
                             'label' => '✏️ Исправить',
-                            'payload' => json_encode(['command' => 'delay', 'text' => 'исправить'])
+                            'payload' => json_encode(['command' => 'delay', 'text' => 'исправить']),
                         ],
-                        'color' => 'negative'
-                    ]
+                        'color' => 'negative',
+                    ],
                 ],
                 [
                     [
                         'action' => [
                             'type' => 'text',
                             'label' => '🏠 Главное меню',
-                            'payload' => json_encode(['command' => 'start'])
+                            'payload' => json_encode(['command' => 'start']),
                         ],
-                        'color' => 'secondary'
-                    ]
-                ]
+                        'color' => 'secondary',
+                    ],
+                ],
             ],
-            'one_time' => false
+            'one_time' => false,
         ];
 
         return json_encode($keyboard, JSON_UNESCAPED_UNICODE);
@@ -464,17 +470,17 @@ class DelayCommand extends BaseCommand
                         'action' => [
                             'type' => 'text',
                             'label' => '🚗 Опоздание',
-                            'payload' => json_encode(['command' => 'delay'])
+                            'payload' => json_encode(['command' => 'delay']),
                         ],
-                        'color' => 'primary'
+                        'color' => 'primary',
                     ],
                     [
                         'action' => [
                             'type' => 'text',
                             'label' => '🤒 Заболел',
-                            'payload' => json_encode(['command' => 'sick'])
+                            'payload' => json_encode(['command' => 'sick']),
                         ],
-                        'color' => 'secondary'
+                        'color' => 'secondary',
                     ],
                 ],
                 [
@@ -482,17 +488,17 @@ class DelayCommand extends BaseCommand
                         'action' => [
                             'type' => 'text',
                             'label' => '🏥 Выхожу с больничного',
-                            'payload' => json_encode(['command' => 'return-sick'])
+                            'payload' => json_encode(['command' => 'return-sick']),
                         ],
-                        'color' => 'positive'
+                        'color' => 'positive',
                     ],
                     [
                         'action' => [
                             'type' => 'text',
                             'label' => '📅 Изменения в расписании',
-                            'payload' => json_encode(['command' => 'schedule'])
+                            'payload' => json_encode(['command' => 'schedule']),
                         ],
-                        'color' => 'primary'
+                        'color' => 'primary',
                     ],
                 ],
                 [
@@ -500,17 +506,17 @@ class DelayCommand extends BaseCommand
                         'action' => [
                             'type' => 'text',
                             'label' => '⚠️ Форс-мажор',
-                            'payload' => json_encode(['command' => 'force-majeure'])
+                            'payload' => json_encode(['command' => 'force-majeure']),
                         ],
-                        'color' => 'negative'
+                        'color' => 'negative',
                     ],
                     [
                         'action' => [
                             'type' => 'text',
                             'label' => '💬 Другое',
-                            'payload' => json_encode(['command' => 'other'])
+                            'payload' => json_encode(['command' => 'other']),
                         ],
-                        'color' => 'primary'
+                        'color' => 'primary',
                     ],
                 ],
             ],
@@ -519,5 +525,4 @@ class DelayCommand extends BaseCommand
 
         return json_encode($keyboard, JSON_UNESCAPED_UNICODE);
     }
-
 }

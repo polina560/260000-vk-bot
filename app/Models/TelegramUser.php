@@ -14,6 +14,7 @@ class TelegramUser extends Model
 		'peer_id',
 		'form_id',
 		'state',
+        'command',
         'prev_state',
         'data',
         'last_activity'
