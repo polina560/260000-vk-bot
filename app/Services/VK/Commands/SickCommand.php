@@ -50,6 +50,7 @@ class SickCommand extends BaseCommand
         ]);
 
 
+
         // Обработка кнопки "Назад"
         if (mb_strtolower($text) === 'назад') {
             if ($prevState === UserState::SickWaitDays->value) {
@@ -193,9 +194,15 @@ class SickCommand extends BaseCommand
         $textLower = mb_strtolower($text);
 
         $validOptions = [
-            'да, буду работать из дома',
-            'могу при необходимости',
-            'нет возможности/не позволяет состояние работать'
+            'yes' ,
+            'mb' ,
+            'no'
+        ];
+
+        $textMessage = [
+            'yes' => 'да, буду работать из дома',
+            'mb' => 'могу при необходимости',
+            'no' => 'нет возможности/не позволяет состояние работать'
         ];
 
         if (!in_array($textLower, $validOptions)) {
@@ -207,7 +214,7 @@ class SickCommand extends BaseCommand
             return;
         }
 
-        $data['remote'] = $text;
+        $data['remote'] = $textMessage[$text];
         $user->prev_state = UserState::SickWaitRemote->value;
         $user->state = UserState::SickWaitComment->value;
         $user->data = $data;
@@ -364,7 +371,7 @@ class SickCommand extends BaseCommand
                         'action' => [
                             'type' => 'text',
                             'label' => '✅ Да, буду работать из дома',
-                            'payload' => json_encode(['command' => 'sick', 'text' => 'да, буду работать из дома'])
+                            'payload' => json_encode(['command' => 'sick', 'text' => 'yes'])
                         ],
                         'color' => 'positive'
                     ]
@@ -374,7 +381,7 @@ class SickCommand extends BaseCommand
                         'action' => [
                             'type' => 'text',
                             'label' => '🔄 Могу при необходимости',
-                            'payload' => json_encode(['command' => 'sick', 'text' => 'могу при необходимости'])
+                            'payload' => json_encode(['command' => 'sick', 'text' => 'mb'])
                         ],
                         'color' => 'primary'
                     ]
@@ -383,8 +390,8 @@ class SickCommand extends BaseCommand
                     [
                         'action' => [
                             'type' => 'text',
-                            'label' => '❌ Нет возможности/не позволяет состояние работать',
-                            'payload' => json_encode(['command' => 'sick', 'text' => 'нет возможности/не позволяет состояние работать'])
+                            'label' => '❌ Нет возможности/не позволяет состояние',
+                            'payload' => json_encode(['command' => 'sick', 'text' => 'no'])
                         ],
                         'color' => 'negative'
                     ]
