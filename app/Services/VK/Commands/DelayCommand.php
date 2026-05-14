@@ -47,23 +47,6 @@ class DelayCommand extends BaseCommand
             'data' => $data,
         ]);
 
-        // Обработка команды "Главное меню"
-        if (mb_strtolower($text) === 'главное меню') {
-            $user->command = CommandType::None->value;
-            $user->state = UserState::None->value;
-            $user->prev_state = UserState::None->value;
-            $user->data = null;
-            $user->save();
-            //            $this->showMainMenu($chat_id);
-
-            $this->sendMessage(
-                'Главное меню',
-                $this->getKeyboardStart(),
-                $chat_id
-            );
-
-            return;
-        }
 
         // Обработка кнопки "Назад"
         if (mb_strtolower($text) === 'назад') {

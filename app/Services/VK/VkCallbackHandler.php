@@ -62,7 +62,51 @@ class VkCallbackHandler
         );
 
         $currentState = $user->state;
-        $currentCommand = $user->command;
+        $currentCommand = CommandType::from($user->command)->value;
+        Log::info('Начало', [
+            'state' => $currentState,
+            'command' => $currentCommand,
+            'text' => $text
+        ]);
+
+
+        $isMainMenu = false;
+        $textLower = mb_strtolower(trim($text));
+
+        if ($textLower === 'главное меню' || $textLower === 'меню' || $textLower === 'start') {
+            $isMainMenu = true;
+        }
+
+        // Также проверяем payload
+        if ($payload) {
+            $payloadData = json_decode($payload, true);
+            $commandFromPayload = $payloadData['command'] ?? $payloadData['action'] ?? '';
+            if ($commandFromPayload === 'start' || $commandFromPayload === 'main_menu') {
+                $isMainMenu = true;
+            }
+        }
+
+        if ($isMainMenu) {
+            Log::info('Возврат в главное меню', [
+                'user_id' => $fromId,
+                'previous_state' => $currentState,
+                'previous_command' => $currentCommand
+            ]);
+
+            // Очищаем состояние пользователя
+            $user->command = CommandType::None->value;
+            $user->state = UserState::None->value;
+            $user->prev_state = UserState::None->value;
+            $user->data = null;
+            $user->save();
+
+            // Показываем главное меню
+            $startCommand = $this->commandFactory->make('start', $peerId, $fromId, null);
+            if ($startCommand) {
+                $startCommand->execute();
+            }
+            return;
+        }
 
         $isPayloadEmpty = empty($payload) || $payload === '{}' || $payload === '""';
 
@@ -88,7 +132,7 @@ class VkCallbackHandler
             }
 
             // ✅ Если команда не найдена, но есть состояние - пробуем определить команду
-            $commandByState = $this->getCommandByState($currentState);
+            $commandByState = CommandType::from($user->command)->value;
             if ($commandByState) {
                 Log::info('Команда определена по состоянию', ['command' => $commandByState]);
                 $commandInstance = $this->commandFactory->make(
@@ -127,7 +171,7 @@ class VkCallbackHandler
             ]);
 
             // Пробуем получить команду по состоянию
-            $commandByState = $this->getCommandByState($currentState);
+            $commandByState = CommandType::from($user->command)->value;
             if ($commandByState) {
                 $commandInstance = $this->commandFactory->make(
                     $commandByState,
@@ -148,34 +192,8 @@ class VkCallbackHandler
         if ($startCommand) {
             $startCommand->execute();
         }
-//        // Обработка текстовых команд
-//        $commandName = $this->parseCommand($text);
-//
-//        if ($commandName) {
-//            Log::info('Обработка текстовой команды', ['command' => $commandName]);
-//
-//            $commandInstance = $this->commandFactory->make($commandName, $peerId, $fromId, ['text' => $text]);
-//            if ($commandInstance) {
-//                $commandInstance->execute();
-//                return;
-//            }
-//        }
-
-        // Если не команда - пересылаем админу
-//        $this->forwardToAdmin($peerId, $fromId, $text, $attachments);
     }
 
-    /**
-     * Определение команды по состоянию пользователя
-     */
-    private function getCommandByState(int $state): ?string
-    {
-        // Здесь нужно определить, какая команда активна
-        // Поскольку у нас одна команда DelayCommand, возвращаем 'delay'
-        // Если будет несколько команд с состояниями, нужно хранить в БД название активной команды
-
-        return 'delay';
-    }
 
     /**
      * Получение имени пользователя по ID

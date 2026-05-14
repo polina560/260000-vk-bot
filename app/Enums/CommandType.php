@@ -2,16 +2,16 @@
 
 namespace App\Enums;
 
-enum CommandType: int
+enum CommandType: string
 {
-    case None = 0;
-    case Start = 10;
-    case Delay = 20;
-    case Sick = 30;
-    case ReturnSick = 40;
-    case Schedule = 50;
-    case ForceMajeure = 60;
-    case Other = 70;
+    case None = 'none';
+    case Start = 'start';
+    case Delay = 'delay';
+    case Sick = 'sick';
+    case ReturnSick = 'return-sick';
+    case Schedule = 'schedule';
+    case ForceMajeure = 'force-majeure';
+    case Other = 'other';
 
     public function toString(): string
     {
