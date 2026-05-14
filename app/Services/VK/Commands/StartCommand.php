@@ -8,7 +8,6 @@ class StartCommand extends BaseCommand
 {
     public function execute(): void
     {
-        $keyboard = $this->getKeyboard();
 
         $message = "👋 Привет! Я бот-помощник.\n\n";
         $message .= "Выберите действие на клавиатуре:\n";
@@ -20,10 +19,11 @@ class StartCommand extends BaseCommand
         $message .= "• Другое - другие вопросы\n";
 
 
+        $keyboard = $this->getKeyboardStart();
         $this->sendMessage($message, $keyboard);
     }
 
-    private function getKeyboard(): string
+    private function getKeyboardStart(): string
     {
         $keyboard = [
             'buttons' => [

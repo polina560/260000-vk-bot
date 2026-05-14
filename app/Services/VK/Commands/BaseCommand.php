@@ -31,11 +31,13 @@ abstract class BaseCommand
     /**
      * Отправка сообщения
      */
-    protected function sendMessage(string $message, ?string $keyboard = null): void
+    protected function sendMessage(string $message, ?string $keyboard = null, ?int $customPeerId = null): void
     {
+        $peerId = $customPeerId ?? $this->peerId;
+
         try {
             $params = [
-                'peer_id' => $this->peerId,
+                'peer_id' => $peerId,
                 'message' => $message,
                 'random_id' => random_int(1, 1000000)
             ];
@@ -83,4 +85,74 @@ abstract class BaseCommand
             'link' => "https://vk.com/id{$this->fromId}",
         ];
     }
+
+
+    /**
+     * ✅ КЛАВИАТУРА ГЛАВНОГО МЕНЮ
+     */
+    protected function getKeyboard(): string
+    {
+        $keyboard = [
+            'buttons' => [
+                [
+                    [
+                        'action' => [
+                            'type' => 'text',
+                            'label' => '🚗 Опоздание',
+                            'payload' => json_encode(['command' => 'delay'])
+                        ],
+                        'color' => 'primary'
+                    ],
+                    [
+                        'action' => [
+                            'type' => 'text',
+                            'label' => '🤒 Заболел',
+                            'payload' => json_encode(['command' => 'sick'])
+                        ],
+                        'color' => 'secondary'
+                    ],
+                ],
+                [
+                    [
+                        'action' => [
+                            'type' => 'text',
+                            'label' => '🏥 Выхожу с больничного',
+                            'payload' => json_encode(['command' => 'return-sick'])
+                        ],
+                        'color' => 'positive'
+                    ],
+                    [
+                        'action' => [
+                            'type' => 'text',
+                            'label' => '📅 Изменения в расписании',
+                            'payload' => json_encode(['command' => 'schedule'])
+                        ],
+                        'color' => 'primary'
+                    ],
+                ],
+                [
+                    [
+                        'action' => [
+                            'type' => 'text',
+                            'label' => '⚠️ Форс-мажор',
+                            'payload' => json_encode(['command' => 'force-majeure'])
+                        ],
+                        'color' => 'negative'
+                    ],
+                    [
+                        'action' => [
+                            'type' => 'text',
+                            'label' => '💬 Другое',
+                            'payload' => json_encode(['command' => 'other'])
+                        ],
+                        'color' => 'primary'
+                    ],
+                ],
+            ],
+            'one_time' => false
+        ];
+
+        return $keyboard;
+    }
+
 }

@@ -92,6 +92,10 @@ class VkCallbackHandler
         }
 
 
+        $startCommand = $this->commandFactory->make('start', $peerId, $fromId, null);
+        if ($startCommand) {
+            $startCommand->execute();
+        }
 
 //        // Обработка текстовых команд
 //        $commandName = $this->parseCommand($text);
@@ -279,4 +283,6 @@ class VkCallbackHandler
 
         return $message;
     }
+
+
 }
