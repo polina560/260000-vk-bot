@@ -49,7 +49,6 @@ class VkBotController extends Controller
         }
 
 
-
         // Message
         if ($data && $data->type === 'message_new') {
             $message = $data->object->message;
@@ -59,6 +58,17 @@ class VkBotController extends Controller
                 $message->text ?? '',
                 $message->payload ?? null,
                 $message->attachments ?? []
+            );
+        } elseif ($data && $data->type === 'message_event') {
+            // 🔥 message_event имеет плоскую структуру в object
+            $event = $data->object;  // ← не $event->message, а сразу $event
+
+            $this->handler->handleCallbackEvent(
+                $event->event_id ?? null,              // ← из $event, не $message
+                $event->user_id ?? null,               // ← user_id, не from_id
+                $event->peer_id ?? null,
+                $event->payload ?? null,
+                $event->conversation_message_id ?? null
             );
         }
 

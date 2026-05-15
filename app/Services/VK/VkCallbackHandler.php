@@ -150,16 +150,64 @@ class VkCallbackHandler
 
 
         // Обработка нажатий на кнопки (payload)
+//        if ($payload) {
+//            $payloadData = json_decode($payload, true);
+//            $command = $payloadData['command'] ?? $payloadData['action'] ?? '';
+//
+//            Log::info('Обработка кнопки', ['command' => $command]);
+//
+//            $commandInstance = $this->commandFactory->make($command, $peerId, $fromId, $payloadData);
+//            if ($commandInstance) {
+//                $commandInstance->execute();
+//                return;
+//            }
+//        }
+
         if ($payload) {
-            $payloadData = json_decode($payload, true);
-            $command = $payloadData['command'] ?? $payloadData['action'] ?? '';
+            // 🔥 Безопасное декодирование с гарантией типа
+            $payloadData = null;
 
-            Log::info('Обработка кнопки', ['command' => $command]);
+            if (is_string($payload)) {
+                $decoded = json_decode($payload, true);
+                // Если декодирование успешно И результат — массив, используем его
+                if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                    $payloadData = $decoded;
+                }
+                // В остальных случаях оставляем $payloadData = null
+            } elseif (is_array($payload)) {
+                // Если payload уже пришёл как массив (редко, но бывает)
+                $payloadData = $payload;
+            }
 
-            $commandInstance = $this->commandFactory->make($command, $peerId, $fromId, $payloadData);
-            if ($commandInstance) {
-                $commandInstance->execute();
-                return;
+            // 🔥 Извлечение команды с поддержкой разных ключей
+            $command = '';
+            if (is_array($payloadData)) {
+                $command = $payloadData['command']
+                    ?? $payloadData['action']
+                    ?? $payloadData['cmd']
+                    ?? '';
+            }
+
+            Log::info('Обработка кнопки', [
+                'command' => $command,
+                'payloadData' => $payloadData,
+                'payload_raw_type' => gettype($payload)
+            ]);
+
+            // 🔥 Вызываем фабрику только если команда найдена
+            // $payloadData гарантированно ?array — ошибка типа невозможна
+            if ($command) {
+                $commandInstance = $this->commandFactory->make(
+                    $command,
+                    $peerId,
+                    $fromId,
+                    $payloadData
+                );
+
+                if ($commandInstance) {
+                    $commandInstance->execute();
+                    return;
+                }
             }
         }
 
@@ -353,5 +401,128 @@ class VkCallbackHandler
         return $message;
     }
 
+
+
+    /**
+     * Отправка подтверждения обработки callback-события
+     */
+    /**
+     * Обработка callback-событий от кнопок типа 'callback'
+     */
+    public function handleCallbackEvent($eventId, $userId, $peerId, $payload, $conversationMessageId = null)
+    {
+        Log::info('Callback event', [
+            'event_id' => $eventId,
+            'user_id' => $userId,
+            'peer_id' => $peerId,
+            'payload_type' => gettype($payload),
+            'payload_raw' => $payload
+        ]);
+
+        // 🔥 Универсальное преобразование payload в массив
+        $payloadData = $this->normalizePayload($payload);
+
+        // Извлекаем команду
+        $command = $payloadData['command']
+            ?? $payloadData['action']
+            ?? $payloadData['cmd']
+            ?? '';
+
+        Log::info('Callback command extracted', [
+            'command' => $command,
+            'payloadData' => $payloadData
+        ]);
+
+        // Создаём и выполняем команду
+        if ($command) {
+            $commandInstance = $this->commandFactory->make(
+                $command,
+                $peerId,
+                $userId,
+                $payloadData
+            );
+
+            if ($commandInstance) {
+                $commandInstance->execute();
+            }
+        }
+
+        // Подтверждаем событие (кнопка перестанет "крутиться")
+        $this->ackCallbackEvent($eventId, $userId, $peerId);
+    }
+
+    /**
+     * 🔥 Вспомогательный метод: преобразует любой тип payload в массив
+     */
+    private function normalizePayload($payload): array
+    {
+        // Уже массив — возвращаем как есть
+        if (is_array($payload)) {
+            return $payload;
+        }
+
+        // Null или пустое — пустой массив
+        if (empty($payload)) {
+            return [];
+        }
+
+        // JSON-строка — декодируем
+        if (is_string($payload)) {
+            $decoded = json_decode($payload, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                return $decoded;
+            }
+            // Если декодирование не удалось — пробуем как объект ниже
+        }
+
+        // Объект stdClass (частый случай из вебхуков) — конвертируем в массив
+        if (is_object($payload)) {
+            return (array) $payload;
+        }
+
+        // Всё остальное — оборачиваем в массив
+        return ['text' => (string) $payload];
+    }
+
+    /**
+     * Отправка подтверждения обработки callback-события
+     */
+    private function ackCallbackEvent($eventId, $userId, $peerId): void
+    {
+        // Если нет event_id — нечего подтверждать
+        if (empty($eventId)) {
+            Log::warning('ackCallbackEvent: пустой event_id');
+            return;
+        }
+
+        try {
+            // Проверяем, что метод существует в клиенте
+            $messages = $this->vk->messages();
+            if (method_exists($messages, 'sendMessageEventAnswer')) {
+                $messages->sendMessageEventAnswer(
+                    $this->accessToken,
+                    [
+                        'event_id' => (string) $eventId,  // 🔥 гарантируем строку
+                        'user_id' => (int) $userId,
+                        'peer_id' => (int) $peerId,
+                        // Опционально: показать всплывающее сообщение
+                        // 'event_data' => json_encode([
+                        //     'type' => 'show_snackbar',
+                        //     'text' => '✅ Принято'
+                        // ])
+                    ]
+                );
+                Log::debug('Callback ack sent', ['event_id' => $eventId]);
+            } else {
+                Log::debug('sendMessageEventAnswer не доступен в этой версии VK API');
+            }
+        } catch (\Exception $e) {
+            // Не критично: даже без ack кнопка со временем перестанет крутиться
+            Log::warning('Ошибка ack callback (не критично)', [
+                'event_id' => $eventId,
+                'error' => $e->getMessage()
+            ]);
+        }
+    }
 
 }
