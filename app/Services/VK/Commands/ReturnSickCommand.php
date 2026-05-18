@@ -171,8 +171,17 @@ class ReturnSickCommand extends BaseCommand
             return;
         }
 
+        $userInfo = $this->getUserInfo();
+        $customName = $user->name;
+        $username = $userInfo['screen_name'] ?: ('id'.$user->form_id);
+
+        $msg = "🚨 *Выход с больничного*\n\n";
+        $msg .= "👤 Сотрудник: {$customName}\n";
+        $msg .= "📱 Username: @{$username}\n";
+        $msg .= "📅 Дата выхода: `{$date}`\n";
+        $msg .= '🕐 Время: '.date('d.m.Y H:i:s');
         // Отправляем админу
-        $this->sendToAdmin($date, $user);
+        $this->sendToAdminWithMarkdown($msg);
 
         // Сохраняем в лог
         Log::info('Запись о выходе с больничного', [
@@ -244,9 +253,17 @@ class ReturnSickCommand extends BaseCommand
         }
 
         $date = $text;
+        $userInfo = $this->getUserInfo();
+        $customName = $user->name;
+        $username = $userInfo['screen_name'] ?: ('id'.$user->form_id);
 
+        $msg = "🚨 *Выход с больничного*\n\n";
+        $msg .= "👤 Сотрудник: {$customName}\n";
+        $msg .= "📱 Username: @{$username}\n";
+        $msg .= "📅 Дата выхода: `{$date}`\n";
+        $msg .= '🕐 Время: '.date('d.m.Y H:i:s');
         // Отправляем админу
-        $this->sendToAdmin($date, $user);
+        $this->sendToAdminWithMarkdown($msg);
 
         // Сохраняем в лог
         Log::info('Запись о выходе с больничного (ручной ввод)', [
@@ -271,9 +288,9 @@ class ReturnSickCommand extends BaseCommand
     }
 
     /**
-     * Отправка сообщения администратору
+     * Отправка сообщения администратору с Markdown
      */
-    private function sendToAdmin(string $date, TelegramUser $user): void
+    private function sendToAdminWithMarkdown(string $message): void
     {
         $adminId = config('services.vk.admin_id');
 
@@ -283,25 +300,15 @@ class ReturnSickCommand extends BaseCommand
             return;
         }
 
-        $userInfo = $this->getUserInfo();
-        $customName = $userInfo['first_name'].' '.$userInfo['last_name'];
-        $username = $userInfo['screen_name'] ?: ('id'.$user->form_id);
-
-        $msg = "🚨 *Выход с больничного*\n\n";
-        $msg .= "👤 Сотрудник: {$customName}\n";
-        $msg .= "📱 Username: @{$username}\n";
-        $msg .= "📅 Дата выхода: `{$date}`\n";
-        $msg .= '🕐 Время: '.date('d.m.Y H:i:s');
-
         try {
             $this->vk->messages()->send($this->accessToken, [
                 'peer_id' => $adminId,
-                'message' => $msg,
+                'message' => $message,
                 'random_id' => random_int(1, 1000000),
                 'parse_mode' => 'markdown',
             ]);
         } catch (\Exception $e) {
-            Log::error('Ошибка отправки сообщения админу: '.$e->getMessage());
+            Log::error('Ошибка отправки сообщения админу: ' . $e->getMessage() . 'peer_id = ' . $adminId);
         }
     }
 
