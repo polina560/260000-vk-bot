@@ -16,6 +16,11 @@ enum UserState: int
     case ReturnSickWaitData = 90;
     case ScheduleWaitText = 100;
     case ScheduleConfirm = 110;
+    case FMWaitType = 120;
+    case FMWaitHours = 130;
+    case FMWaitDays = 140;
+    case FMWaitReason = 150;
+    case FMConfirm = 160;
 
     public function toString(): string
     {
@@ -32,6 +37,11 @@ enum UserState: int
             self::ReturnSickWaitData => 'ReturnSickWaitData',
             self::ScheduleWaitText => 'ScheduleWaitText',
             self::ScheduleConfirm => 'ScheduleConfirm',
+            self::FMWaitType => 'FMWaitType',
+            self::FMWaitHours => 'FMWaitHours',
+            self::FMWaitDays => 'FMWaitDays',
+            self::FMWaitReason => 'FMWaitReason',
+            self::FMConfirm => 'FMConfirm',
         };
     }
 }
