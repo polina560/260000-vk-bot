@@ -14,6 +14,8 @@ enum UserState: int
     case SickWaitRemote = 70;
     case ReturnSickWaitManualDate = 80;
     case ReturnSickWaitData = 90;
+    case ScheduleWaitText = 100;
+    case ScheduleConfirm = 110;
 
     public function toString(): string
     {
@@ -28,6 +30,8 @@ enum UserState: int
             self::SickWaitRemote => 'SickWaitRemote',
             self::ReturnSickWaitManualDate => 'ReturnSickWaitManualDate',
             self::ReturnSickWaitData => 'ReturnSickWaitData',
+            self::ScheduleWaitText => 'ScheduleWaitText',
+            self::ScheduleConfirm => 'ScheduleConfirm',
         };
     }
 }
