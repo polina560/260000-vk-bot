@@ -21,6 +21,8 @@ enum UserState: int
     case FMWaitDays = 140;
     case FMWaitReason = 150;
     case FMConfirm = 160;
+    case OtherWaitText = 170;
+    case OtherConfirm = 180;
 
     public function toString(): string
     {
@@ -42,6 +44,8 @@ enum UserState: int
             self::FMWaitDays => 'FMWaitDays',
             self::FMWaitReason => 'FMWaitReason',
             self::FMConfirm => 'FMConfirm',
+            self::OtherWaitText => 'OtherWaitText',
+            self::OtherConfirm => 'OtherConfirm',
         };
     }
 }
