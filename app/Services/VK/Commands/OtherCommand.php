@@ -152,7 +152,7 @@ class OtherCommand extends BaseCommand
             $msg .= '🕐 Время: ' . date('d.m.Y H:i:s');
 
             $this->sendToAdminWithMarkdown($msg);
-            $this->logOtherEvent($userId, $msg);
+            $this->logOtherEvent($user->id, $msg);
 
             $this->resetUserState($user);
 

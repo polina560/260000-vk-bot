@@ -14,7 +14,9 @@ class ForceMajeureCommand extends BaseCommand
      * Основные состояния для форс-мажора
      */
     private const TYPE_HOURS = 'В рамках нескольких часов';
+
     private const TYPE_ALL_DAY = 'Весь день';
+
     private const TYPE_SEVERAL_DAYS = 'Несколько дней';
 
     public function execute(): void
@@ -62,12 +64,14 @@ class ForceMajeureCommand extends BaseCommand
             if ($startCommand) {
                 $startCommand->execute();
             }
+
             return;
         }
 
         // 🔹 Обработка кнопки "Назад"
         if ($textLower === 'назад') {
             $this->handleBack($user, $prevState, $peerId, $data);
+
             return;
         }
 
@@ -113,6 +117,7 @@ class ForceMajeureCommand extends BaseCommand
                 $this->getTypeKeyboard(),
                 $peerId
             );
+
             return;
         }
 
@@ -129,6 +134,7 @@ class ForceMajeureCommand extends BaseCommand
                 $this->getBackKeyboard(),
                 $peerId
             );
+
             return;
         }
 
@@ -142,6 +148,7 @@ class ForceMajeureCommand extends BaseCommand
                 $this->getBackKeyboard(),
                 $peerId
             );
+
             return;
         }
 
@@ -171,6 +178,7 @@ class ForceMajeureCommand extends BaseCommand
                 $this->getBackKeyboard(),
                 $peerId
             );
+
             return;
         }
 
@@ -181,10 +189,11 @@ class ForceMajeureCommand extends BaseCommand
                 $this->getBackKeyboard(),
                 $peerId
             );
+
             return;
         }
 
-        $data['duration'] = $hours . ' ч';
+        $data['duration'] = $hours.' ч';
         $user->state = UserState::FMWaitReason->value;
         $user->data = $data;
         $user->save();
@@ -209,6 +218,7 @@ class ForceMajeureCommand extends BaseCommand
                 $this->getBackKeyboard(),
                 $peerId
             );
+
             return;
         }
 
@@ -219,10 +229,11 @@ class ForceMajeureCommand extends BaseCommand
                 $this->getBackKeyboard(),
                 $peerId
             );
+
             return;
         }
 
-        $data['duration'] = $days . ' дн.';
+        $data['duration'] = $days.' дн.';
         $user->state = UserState::FMWaitReason->value;
         $user->data = $data;
         $user->save();
@@ -247,6 +258,7 @@ class ForceMajeureCommand extends BaseCommand
                 $this->getBackKeyboard(),
                 $peerId
             );
+
             return;
         }
 
@@ -256,6 +268,7 @@ class ForceMajeureCommand extends BaseCommand
                 $this->getBackKeyboard(),
                 $peerId
             );
+
             return;
         }
 
@@ -269,7 +282,7 @@ class ForceMajeureCommand extends BaseCommand
         $reply .= "⚠️ Тип отсутствия: {$data['type']}\n";
         $reply .= "⏱️ Длительность: {$data['duration']}\n";
         $reply .= "📝 Причина: {$data['reason']}\n\n";
-        $reply .= "✅ Все верно? Напиши *Да* или *Исправить*";
+        $reply .= '✅ Все верно? Напиши *Да* или *Исправить*';
 
         $this->sendMessage(
             $reply,
@@ -289,8 +302,8 @@ class ForceMajeureCommand extends BaseCommand
 
         if ($textLower === 'да') {
             $userInfo = $this->getUserInfo();
-            $customName = trim(($userInfo['first_name'] ?? '') . ' ' . ($userInfo['last_name'] ?? ''));
-            $username = $userInfo['screen_name'] ?: ('id' . $userId);
+            $customName = trim(($userInfo['first_name'] ?? '').' '.($userInfo['last_name'] ?? ''));
+            $username = $userInfo['screen_name'] ?: ('id'.$userId);
 
             $msg = "🚨 *Отсутствие на работе (форс-мажор)*\n\n";
             $msg .= "👤 Сотрудник: {$customName}\n";
@@ -298,11 +311,10 @@ class ForceMajeureCommand extends BaseCommand
             $msg .= "⚠️ Тип: `{$data['type']}`\n";
             $msg .= "⏱️ Длительность: `{$data['duration']}`\n";
             $msg .= "📝 Причина: `{$data['reason']}`\n";
-            $msg .= '🕐 Время: ' . date('d.m.Y H:i:s');
+            $msg .= '🕐 Время: '.date('d.m.Y H:i:s');
 
             $this->sendToAdminWithMarkdown($msg);
-            $this->logForceMajeureEvent($userId, $msg);
-
+            $this->logForceMajeureEvent($user->id, $msg);
 
             $this->resetUserState($user);
 
@@ -311,6 +323,7 @@ class ForceMajeureCommand extends BaseCommand
                 $this->getKeyboardStart(),
                 $peerId
             );
+
             return;
 
         } elseif ($textLower === 'исправить') {
@@ -325,11 +338,12 @@ class ForceMajeureCommand extends BaseCommand
                 $this->getTypeKeyboard(),
                 $peerId
             );
+
             return;
         }
 
         $this->sendMessage(
-            "❓ Напиши *Да* для подтверждения или *Исправить*, чтобы внести правки.",
+            '❓ Напиши *Да* для подтверждения или *Исправить*, чтобы внести правки.',
             $this->getConfirmKeyboard(),
             $peerId
         );
@@ -435,9 +449,9 @@ class ForceMajeureCommand extends BaseCommand
      */
     private function logForceMajeureEvent(int $userId, string $description): void
     {
-        $log = new UserLog();
+        $log = new UserLog;
         $log->telegram_user_id = $userId;
-        $log->type = "Форс-мажор";
+        $log->type = 'Форс-мажор';
         $log->description = $description;
         $log->date = now();
         $log->save();
@@ -452,6 +466,7 @@ class ForceMajeureCommand extends BaseCommand
 
         if (!$adminId) {
             Log::error('ID администратора не указан');
+
             return;
         }
 
@@ -464,7 +479,7 @@ class ForceMajeureCommand extends BaseCommand
             ]);
             Log::info('Force majeure message sent to admin');
         } catch (\Exception $e) {
-            Log::error('Ошибка отправки админу: ' . $e->getMessage());
+            Log::error('Ошибка отправки админу: '.$e->getMessage());
         }
     }
 
@@ -475,7 +490,7 @@ class ForceMajeureCommand extends BaseCommand
     {
         $userInfo = $this->getUserInfo();
 
-        return ($userInfo['first_name'] ?? 'Пользователь') . ' ' . ($userInfo['last_name'] ?? '');
+        return ($userInfo['first_name'] ?? 'Пользователь').' '.($userInfo['last_name'] ?? '');
     }
 
     // 🔽 КЛАВИАТУРЫ (VK Format) 🔽

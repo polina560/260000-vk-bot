@@ -156,7 +156,7 @@ class ScheduleCommand extends BaseCommand
             $this->sendToAdminWithMarkdown($msg);
 
             // 🗄️ Опционально: сохранение в БД
-            $this->logScheduleChange($userId, $msg);
+            $this->logScheduleChange($user->id, $msg);
 
             $this->resetUserState($user);
 
