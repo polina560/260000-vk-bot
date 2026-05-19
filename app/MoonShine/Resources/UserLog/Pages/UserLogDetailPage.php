@@ -30,11 +30,11 @@ class UserLogDetailPage extends DetailPage
         return [
 			ID::make('id')
 				->sortable(),
-			Text::make('Name', 'name'),
-			Text::make('Type', 'type'),
-			Text::make('Description', 'description'),
-			Date::make('Date', 'date'),
-			BelongsTo::make('TelegramUserId', 'telegramUser', resource: TelegramUserResource::class),
+            BelongsTo::make('Имя', 'telegramUser', 'name', resource: TelegramUserResource::class),
+            Text::make('Username', 'name'),
+            Text::make('Тип', 'type'),
+            Text::make('Описание', 'description'),
+            Date::make('Дата', 'date'),
         ];
     }
 
