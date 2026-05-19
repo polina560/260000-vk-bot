@@ -227,7 +227,7 @@ class OtherCommand extends BaseCommand
     {
         $log = new UserLog();
         $log->telegram_user_id = $userId;
-        $log->type = "Опоздание";
+        $log->type = "Другое";
         $log->description = $description;
         $log->date = now();
         $log->save();

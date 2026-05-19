@@ -352,7 +352,7 @@ class SickCommand extends BaseCommand
     {
         $log = new UserLog();
         $log->telegram_user_id = $userId;
-        $log->type = "Опоздание";
+        $log->type = "Болезнь";
         $log->description = $description;
         $log->date = now();
         $log->save();
