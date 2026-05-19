@@ -285,7 +285,7 @@ class DelayCommand extends BaseCommand
 
             $log = new UserLog();
             $log->telegram_user_id = $user->id;
-            $log->type = "Delay";
+            $log->type = "Опоздание";
             $log->description = $msg;
             $log->date = now();
             $log->save();

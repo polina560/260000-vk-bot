@@ -5,6 +5,7 @@ namespace App\Services\VK\Commands;
 use App\Enums\CommandType;
 use App\Enums\UserState;
 use App\Models\TelegramUser;
+use App\Models\UserLog;
 use Illuminate\Support\Facades\Log;
 
 class SickCommand extends BaseCommand
@@ -305,13 +306,7 @@ class SickCommand extends BaseCommand
                 $bd .= "\n💬 Комментарий: {$data['comment']}";
             }
 
-            Log::info('Запись о больничном', [
-                'user_id' => $telegram_id,
-                'custom_name' => $customName,
-                'days' => $data['days'],
-                'remote' => $data['remote'],
-                'comment' => $data['comment'] ?? ''
-            ]);
+         $this->logSickChange($user->id, $bd);
 
             // Очищаем состояние пользователя
             $user->command = CommandType::None->value;
@@ -348,6 +343,19 @@ class SickCommand extends BaseCommand
             );
             return;
         }
+    }
+
+    /**
+     * Логирование изменения расписания в БД
+     */
+    private function logSickChange(int $userId, string $description): void
+    {
+        $log = new UserLog();
+        $log->telegram_user_id = $userId;
+        $log->type = "Опоздание";
+        $log->description = $description;
+        $log->date = now();
+        $log->save();
     }
 
     /**

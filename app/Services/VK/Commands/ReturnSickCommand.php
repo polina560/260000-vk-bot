@@ -5,6 +5,7 @@ namespace App\Services\VK\Commands;
 use App\Enums\CommandType;
 use App\Enums\UserState;
 use App\Models\TelegramUser;
+use App\Models\UserLog;
 use Illuminate\Support\Facades\Log;
 
 class ReturnSickCommand extends BaseCommand
@@ -265,12 +266,7 @@ class ReturnSickCommand extends BaseCommand
         // Отправляем админу
         $this->sendToAdminWithMarkdown($msg);
 
-        // Сохраняем в лог
-        Log::info('Запись о выходе с больничного (ручной ввод)', [
-            'user_id' => $telegram_id,
-            'user_name' => $user->name,
-            'date' => $date,
-        ]);
+        $this->logReturnSickEvent($user->id, $msg);
 
         // Очищаем состояние
         $user->command = CommandType::None->value;
@@ -285,6 +281,19 @@ class ReturnSickCommand extends BaseCommand
             $this->getKeyboardStart(),
             $chat_id
         );
+    }
+
+    /**
+     * Логирование события "другое" в БД
+     */
+    private function logReturnSickEvent(int $userId, string $description): void
+    {
+        $log = new UserLog();
+        $log->telegram_user_id = $userId;
+        $log->type = "Опоздание";
+        $log->description = $description;
+        $log->date = now();
+        $log->save();
     }
 
     /**

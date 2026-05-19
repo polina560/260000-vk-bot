@@ -5,6 +5,7 @@ namespace App\Services\VK\Commands;
 use App\Enums\CommandType;
 use App\Enums\UserState;
 use App\Models\TelegramUser;
+use App\Models\UserLog;
 use Illuminate\Support\Facades\Log;
 
 class ForceMajeureCommand extends BaseCommand
@@ -300,7 +301,8 @@ class ForceMajeureCommand extends BaseCommand
             $msg .= '🕐 Время: ' . date('d.m.Y H:i:s');
 
             $this->sendToAdminWithMarkdown($msg);
-            $this->logForceMajeureEvent($userId, $customName, $data);
+            $this->logForceMajeureEvent($userId, $msg);
+
 
             $this->resetUserState($user);
 
@@ -431,21 +433,14 @@ class ForceMajeureCommand extends BaseCommand
     /**
      * Логирование события форс-мажора в БД
      */
-    private function logForceMajeureEvent(int $userId, string $customName, array $data): void
+    private function logForceMajeureEvent(int $userId, string $description): void
     {
-        try {
-            \DB::table('user_event_log')->insert([
-                'user_id' => $userId,
-                'custom_name' => $customName,
-                'event_type' => 'force_majeure',
-                'message_content' => "Тип: {$data['type']}\nДлительность: {$data['duration']}\nПричина: {$data['reason']}",
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-            Log::info('Force majeure logged', ['user_id' => $userId]);
-        } catch (\Exception $e) {
-            Log::error('Ошибка логирования форс-мажора: ' . $e->getMessage());
-        }
+        $log = new UserLog();
+        $log->telegram_user_id = $userId;
+        $log->type = "Опоздание";
+        $log->description = $description;
+        $log->date = now();
+        $log->save();
     }
 
     /**

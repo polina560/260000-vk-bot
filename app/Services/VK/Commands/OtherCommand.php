@@ -5,6 +5,7 @@ namespace App\Services\VK\Commands;
 use App\Enums\CommandType;
 use App\Enums\UserState;
 use App\Models\TelegramUser;
+use App\Models\UserLog;
 use Illuminate\Support\Facades\Log;
 
 class OtherCommand extends BaseCommand
@@ -151,7 +152,7 @@ class OtherCommand extends BaseCommand
             $msg .= '🕐 Время: ' . date('d.m.Y H:i:s');
 
             $this->sendToAdminWithMarkdown($msg);
-            $this->logOtherEvent($userId, $customName, $data['text']);
+            $this->logOtherEvent($userId, $msg);
 
             $this->resetUserState($user);
 
@@ -222,21 +223,14 @@ class OtherCommand extends BaseCommand
     /**
      * Логирование события "другое" в БД
      */
-    private function logOtherEvent(int $userId, string $customName, string $message): void
+    private function logOtherEvent(int $userId, string $description): void
     {
-        try {
-            \DB::table('user_event_log')->insert([
-                'user_id' => $userId,
-                'custom_name' => $customName,
-                'event_type' => 'other',
-                'message_content' => $message,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-            Log::info('Other event logged', ['user_id' => $userId]);
-        } catch (\Exception $e) {
-            Log::error('Ошибка логирования события: ' . $e->getMessage());
-        }
+        $log = new UserLog();
+        $log->telegram_user_id = $userId;
+        $log->type = "Опоздание";
+        $log->description = $description;
+        $log->date = now();
+        $log->save();
     }
 
     /**

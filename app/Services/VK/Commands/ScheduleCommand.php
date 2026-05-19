@@ -5,6 +5,7 @@ namespace App\Services\VK\Commands;
 use App\Enums\CommandType;
 use App\Enums\UserState;
 use App\Models\TelegramUser;
+use App\Models\UserLog;
 use Illuminate\Support\Facades\Log;
 
 class ScheduleCommand extends BaseCommand
@@ -155,7 +156,7 @@ class ScheduleCommand extends BaseCommand
             $this->sendToAdminWithMarkdown($msg);
 
             // 🗄️ Опционально: сохранение в БД
-            $this->logScheduleChange($userId, $customName, $data['schedule']);
+            $this->logScheduleChange($userId, $msg);
 
             $this->resetUserState($user);
 
@@ -225,21 +226,14 @@ class ScheduleCommand extends BaseCommand
     /**
      * Логирование изменения расписания в БД
      */
-    private function logScheduleChange(int $userId, string $customName, string $schedule): void
+    private function logScheduleChange(int $userId, string $description): void
     {
-        try {
-            \DB::table('user_event_log')->insert([
-                'user_id' => $userId,
-                'custom_name' => $customName,
-                'event_type' => 'schedule',
-                'message_content' => 'Изменения в расписании: ' . $schedule,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-            Log::info('Schedule change logged', ['user_id' => $userId]);
-        } catch (\Exception $e) {
-            Log::error('Ошибка логирования расписания: ' . $e->getMessage());
-        }
+        $log = new UserLog();
+        $log->telegram_user_id = $userId;
+        $log->type = "Опоздание";
+        $log->description = $description;
+        $log->date = now();
+        $log->save();
     }
 
     /**
