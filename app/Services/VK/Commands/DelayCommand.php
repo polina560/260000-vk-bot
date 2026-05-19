@@ -273,30 +273,20 @@ class DelayCommand extends BaseCommand
             $username = $userInfo['screen_name'] ?: ('id' . $telegram_id);
 
             // Формируем сообщение для администратора
-            $msg = "🚨 *НОВОЕ ОПОЗДАНИЕ*\n\n";
+            $msg = "🚨 ОПОЗДАНИЕ\n\n";
             $msg .= "👤 Сотрудник: {$customName}\n";
             $msg .= "📱 Username: @{$username}\n";
             $msg .= "⏰ Опоздание: `{$data['delay_minutes']} мин`\n";
             $msg .= "📝 Причина: `{$data['reason']}`\n";
-            $msg .= '🕐 Время: ' . date('d.m.Y H:i:s');
 
             // Отправляем администратору
             $this->sendToAdminWithMarkdown($msg);
 
-            $log = new UserLog();
-            $log->telegram_user_id = $user->id;
-            $log->type = "Опоздание";
-            $log->description = $msg;
-            $log->date = now();
-            $log->save();
+            $description = "Опоздание на: `{$data['delay_minutes']} мин`\n"
+                . "Причина: `{$data['reason']}`\n";
 
-            // Сохраняем в лог
-            Log::info('Запись об опоздании', [
-                'user_id' => $telegram_id,
-                'custom_name' => $customName,
-                'delay_minutes' => $data['delay_minutes'],
-                'reason' => $data['reason'],
-            ]);
+            $this->logDelayEvent($user->id, $description, $username);
+
 
             // Очищаем состояние пользователя
             $user->command = CommandType::None->value;
@@ -332,6 +322,20 @@ class DelayCommand extends BaseCommand
 
             return;
         }
+    }
+
+    /**
+     * Логирование события форс-мажора в БД
+     */
+    private function logDelayEvent(int $userId, string $description, string $username): void
+    {
+        $log = new UserLog;
+        $log->name = $username;
+        $log->telegram_user_id = $userId;
+        $log->type = 'Форс-мажор';
+        $log->description = $description;
+        $log->date = now();
+        $log->save();
     }
 
     /**

@@ -147,16 +147,15 @@ class ScheduleCommand extends BaseCommand
             $customName = trim(($userInfo['first_name'] ?? '') . ' ' . ($userInfo['last_name'] ?? ''));
             $username = $userInfo['screen_name'] ?: ('id' . $userId);
 
-            $msg = "🚨 *Изменение в расписании*\n\n";
+            $msg = "🚨 Изменение в расписании\n\n";
             $msg .= "👤 Сотрудник: {$customName}\n";
-            $msg .= "🔗 Ссылка: https://vk.com/{$username}\n";
+            $msg .= "📱 Username: @{$username}\n";
             $msg .= "📅 Изменения:\n`{$data['schedule']}`\n";
-            $msg .= '🕐 Время: ' . date('d.m.Y H:i:s');
 
             $this->sendToAdminWithMarkdown($msg);
 
-            // 🗄️ Опционально: сохранение в БД
-            $this->logScheduleChange($user->id, $msg);
+            $description = "Изменения:\n`{$data['schedule']}`\n";
+            $this->logScheduleChange($user->id, $description, $username);
 
             $this->resetUserState($user);
 
@@ -226,9 +225,10 @@ class ScheduleCommand extends BaseCommand
     /**
      * Логирование изменения расписания в БД
      */
-    private function logScheduleChange(int $userId, string $description): void
+    private function logScheduleChange(int $userId, string $description, string $username): void
     {
         $log = new UserLog();
+        $log->name = $username;
         $log->telegram_user_id = $userId;
         $log->type = "Изменение в расписании";
         $log->description = $description;

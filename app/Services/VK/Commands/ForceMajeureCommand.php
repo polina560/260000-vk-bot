@@ -305,16 +305,21 @@ class ForceMajeureCommand extends BaseCommand
             $customName = trim(($userInfo['first_name'] ?? '').' '.($userInfo['last_name'] ?? ''));
             $username = $userInfo['screen_name'] ?: ('id'.$userId);
 
-            $msg = "🚨 *Отсутствие на работе (форс-мажор)*\n\n";
+            $msg = "🚨 Ффорс-мажор\n\n";
             $msg .= "👤 Сотрудник: {$customName}\n";
-            $msg .= "🔗 Ссылка: https://vk.com/{$username}\n";
+            $msg .= "📱 Username: @{$username}\n";
             $msg .= "⚠️ Тип: `{$data['type']}`\n";
             $msg .= "⏱️ Длительность: `{$data['duration']}`\n";
             $msg .= "📝 Причина: `{$data['reason']}`\n";
             $msg .= '🕐 Время: '.date('d.m.Y H:i:s');
 
             $this->sendToAdminWithMarkdown($msg);
-            $this->logForceMajeureEvent($user->id, $msg);
+
+            $description = "Тип: `{$data['type']}`\n"
+            ."Длительность: `{$data['duration']}`\n"
+                ."Причина: `{$data['reason']}`\n";
+
+            $this->logForceMajeureEvent($user->id, $description, $username);
 
             $this->resetUserState($user);
 
@@ -447,9 +452,10 @@ class ForceMajeureCommand extends BaseCommand
     /**
      * Логирование события форс-мажора в БД
      */
-    private function logForceMajeureEvent(int $userId, string $description): void
+    private function logForceMajeureEvent(int $userId, string $description, string $username): void
     {
         $log = new UserLog;
+        $log->name = $username;
         $log->telegram_user_id = $userId;
         $log->type = 'Форс-мажор';
         $log->description = $description;

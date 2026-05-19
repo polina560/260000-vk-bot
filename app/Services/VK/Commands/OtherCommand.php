@@ -147,12 +147,13 @@ class OtherCommand extends BaseCommand
 
             $msg = "ℹ️ *Просто оповещение*\n\n";
             $msg .= "👤 Сотрудник: {$customName}\n";
-            $msg .= "🔗 Ссылка: https://vk.com/{$username}\n";
+            $msg .= "📱 Username: @{$username}\n";
             $msg .= "💬 Сообщение:\n`{$data['text']}`\n";
-            $msg .= '🕐 Время: ' . date('d.m.Y H:i:s');
 
             $this->sendToAdminWithMarkdown($msg);
-            $this->logOtherEvent($user->id, $msg);
+
+            $description = "Сообщение:\n`{$data['text']}`\n";
+            $this->logOtherEvent($user->id, $msg, $description);
 
             $this->resetUserState($user);
 
@@ -223,9 +224,10 @@ class OtherCommand extends BaseCommand
     /**
      * Логирование события "другое" в БД
      */
-    private function logOtherEvent(int $userId, string $description): void
+    private function logOtherEvent(int $userId, string $description, string $username): void
     {
         $log = new UserLog();
+        $log->name = $username;
         $log->telegram_user_id = $userId;
         $log->type = "Другое";
         $log->description = $description;

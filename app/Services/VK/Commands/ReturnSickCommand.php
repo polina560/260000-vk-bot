@@ -258,15 +258,15 @@ class ReturnSickCommand extends BaseCommand
         $customName = $user->name;
         $username = $userInfo['screen_name'] ?: ('id'.$user->form_id);
 
-        $msg = "🚨 *Выход с больничного*\n\n";
+        $msg = "🚨 Выход с больничного\n\n";
         $msg .= "👤 Сотрудник: {$customName}\n";
         $msg .= "📱 Username: @{$username}\n";
         $msg .= "📅 Дата выхода: `{$date}`\n";
-        $msg .= '🕐 Время: '.date('d.m.Y H:i:s');
         // Отправляем админу
         $this->sendToAdminWithMarkdown($msg);
 
-        $this->logReturnSickEvent($user->id, $msg);
+        $description = "Дата выхода: `{$date}`\n";
+        $this->logReturnSickEvent($user->id, $description, $username);
 
         // Очищаем состояние
         $user->command = CommandType::None->value;
@@ -286,9 +286,10 @@ class ReturnSickCommand extends BaseCommand
     /**
      * Логирование события "другое" в БД
      */
-    private function logReturnSickEvent(int $userId, string $description): void
+    private function logReturnSickEvent(int $userId, string $description, string $username): void
     {
         $log = new UserLog();
+        $log->name = $username;
         $log->telegram_user_id = $userId;
         $log->type = "Выход с больничного";
         $log->description = $description;

@@ -286,7 +286,7 @@ class SickCommand extends BaseCommand
             $username = $userInfo['screen_name'] ?: ('id' . $telegram_id);
 
             // Формируем сообщение для администратора
-            $msg = "🚨 *НОВЫЙ БОЛЬНИЧНЫЙ*\n\n";
+            $msg = "🚨 НОВЫЙ БОЛЬНИЧНЫЙ\n\n";
             $msg .= "👤 Сотрудник: {$customName}\n";
             $msg .= "📱 Username: @{$username}\n";
             $msg .= "📅 Дней отсутствия: `{$data['days']}`\n";
@@ -294,19 +294,15 @@ class SickCommand extends BaseCommand
             if (!empty($data['comment'])) {
                 $msg .= "💬 Комментарий: `{$data['comment']}`\n";
             }
-            $msg .= "🕐 Время: " . date('d.m.Y H:i:s');
 
             // Отправляем администратору
             $this->sendToAdminWithMarkdown($msg);
 
-            // Сохраняем в лог
-            $bd = "📅 Дней отсутствия: " . $data['days'] . "\n";
-            $bd .= "💻 Работа из дома: {$data['remote']}";
-            if (!empty($data['comment'])) {
-                $bd .= "\n💬 Комментарий: {$data['comment']}";
-            }
+            $description = "Отсутствие (в днях): `{$data['days']}`\n"
+            ."Работа из дома: `{$data['remote']}`\n"
+            ."Комментарий: `{$data['comment']}`\n";
 
-         $this->logSickChange($user->id, $bd);
+         $this->logSickChange($user->id, $description, $username);
 
             // Очищаем состояние пользователя
             $user->command = CommandType::None->value;
@@ -348,10 +344,11 @@ class SickCommand extends BaseCommand
     /**
      * Логирование изменения расписания в БД
      */
-    private function logSickChange(int $userId, string $description): void
+    private function logSickChange(int $userId, string $description, string $username): void
     {
         $log = new UserLog();
         $log->telegram_user_id = $userId;
+        $log->name = $username;
         $log->type = "Болезнь";
         $log->description = $description;
         $log->date = now();
