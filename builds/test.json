@@ -2,9 +2,9 @@
     "_comment": "php artisan moonshine:build test.json",
     "resources": [
         {
-            "name": "Telegram User",
-            "menuName": "Пользователи телеграм",
-            "table": "telegram_user",
+            "name": "User Logs",
+            "menuName": "Логи ползователей",
+            "table": "user_logs",
             "timestamps": true,
 
             "withMigration": true,
@@ -23,19 +23,26 @@
                     "nullable": true
                 },
                 {
-                    "column": "peer_id",
+                    "column": "type",
                     "type": "string",
                     "nullable": true
                 },
                 {
-                    "column": "form_id",
-                    "type": "string",
+                    "column": "description",
+                    "type": "text",
                     "nullable": true
                 },
                 {
-                    "column": "state",
-                    "type": "integer",
-                    "default": 0
+                    "column": "date",
+                    "type": "timestamp",
+                    "nullable": true
+                },
+                {
+                    "column": "telegram_user_id",
+                    "type": "BelongsTo",
+                    "relation": {
+                        "table" : "telegram_users"
+                    }
                 }
             ]
         }

@@ -12,6 +12,7 @@ use MoonShine\Laravel\Layouts\AppLayout;
 use MoonShine\MenuManager\MenuItem;
 use Override;
 use App\MoonShine\Resources\TelegramUser\TelegramUserResource;
+use App\MoonShine\Resources\UserLog\UserLogResource;
 
 final class MoonShineLayout extends AppLayout
 {
@@ -36,6 +37,7 @@ final class MoonShineLayout extends AppLayout
             MenuItem::make(UserResource::class),
             MenuItem::make(TextResource::class),
             MenuItem::make(TelegramUserResource::class, 'Пользователи телеграм'),
+            MenuItem::make(UserLogResource::class, 'Логи ползователей'),
         ];
     }
 

@@ -5,6 +5,7 @@ namespace App\Services\VK\Commands;
 use App\Enums\CommandType;
 use App\Enums\UserState;
 use App\Models\TelegramUser;
+use App\Models\UserLog;
 use Illuminate\Support\Facades\Log;
 
 class DelayCommand extends BaseCommand
@@ -281,6 +282,13 @@ class DelayCommand extends BaseCommand
 
             // Отправляем администратору
             $this->sendToAdminWithMarkdown($msg);
+
+            $log = new UserLog();
+            $log->telegram_user_id = $user->id;
+            $log->type = "Delay";
+            $log->description = $msg;
+            $log->date = now();
+            $log->save();
 
             // Сохраняем в лог
             Log::info('Запись об опоздании', [
