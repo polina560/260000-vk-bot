@@ -169,19 +169,70 @@ class DelayCommand extends BaseCommand
     private function handleWaitTime(TelegramUser $user, string $text, array $data): void
     {
         $chat_id = $user->peer_id;
+        $textLower = mb_strtolower(trim($text));
 
-        // Проверка на числовое значение
+        if ($textLower === 'custom') {
+            $data['waiting_for_custom'] = true;
+            $user->data = $data;
+            $user->save();
+
+            $this->sendMessage(
+                '✍️ Введите количество минут вручную (числом):',
+                $this->getBackKeyboard(),
+                $chat_id
+            );
+            return;
+        }
+
+        if (!empty($data['waiting_for_custom'])) {
+            // Очищаем флаг
+            unset($data['waiting_for_custom']);
+
+            // Проверка на числовое значение
+            if (!is_numeric($text)) {
+                $this->sendMessage(
+                    '❌ Ошибка! Укажи время опоздания в минутах числом (например: 15):',
+                    $this->getTimeKeyboard(),
+                    $chat_id
+                );
+                return;
+            }
+
+            $minutes = (int) $text;
+
+            if ($minutes < 1 || $minutes > 999) {
+                $this->sendMessage(
+                    '❌ Ошибка! Укажи число от 1 до 999 минут:',
+                    $this->getTimeKeyboard(),
+                    $chat_id
+                );
+                return;
+            }
+
+            $data['delay_minutes'] = $minutes;
+            $user->prev_state = UserState::WaitTime->value;
+            $user->state = UserState::WaitReason->value;
+            $user->data = $data;
+            $user->save();
+
+            $this->sendMessage(
+                '📝 Укажи причину опоздания:',
+                $this->getBackKeyboard(),
+                $chat_id
+            );
+            return;
+        }
+
         if (!is_numeric($text)) {
             $this->sendMessage(
                 '❌ Ошибка! Укажи время опоздания в минутах числом (например: 15):',
                 $this->getTimeKeyboard(),
                 $chat_id
             );
-
             return;
         }
 
-        $minutes = (int)$text;
+        $minutes = (int) $text;
 
         if ($minutes < 1 || $minutes > 999) {
             $this->sendMessage(
@@ -189,12 +240,10 @@ class DelayCommand extends BaseCommand
                 $this->getTimeKeyboard(),
                 $chat_id
             );
-
             return;
         }
 
         $data['delay_minutes'] = $minutes;
-
         $user->prev_state = UserState::WaitTime->value;
         $user->state = UserState::WaitReason->value;
         $user->data = $data;
@@ -340,7 +389,7 @@ class DelayCommand extends BaseCommand
                         'action' => [
                             'type' => 'text',
                             'label' => '✏️ Своё значение',
-                            'payload' => json_encode(['command' => 'delay', 'text' => 'custom']),
+                            'payload' => json_encode(['command' => 'delay', 'text' => 'custom'], JSON_UNESCAPED_UNICODE),
                         ],
                         'color' => 'secondary',
                     ],
