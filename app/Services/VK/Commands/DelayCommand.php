@@ -4,6 +4,7 @@ namespace App\Services\VK\Commands;
 
 use App\Enums\CommandType;
 use App\Enums\UserState;
+use App\Models\AdminUser;
 use App\Models\TelegramUser;
 use App\Models\UserLog;
 use Illuminate\Support\Facades\Log;
@@ -343,24 +344,28 @@ class DelayCommand extends BaseCommand
      */
     private function sendToAdminWithMarkdown(string $message): void
     {
-        $adminId = config('services.vk.admin_id');
+//        $adminId = config('services.vk.admin_id');
 
-        if (!$adminId) {
-            Log::error('ID администратора не указан');
+        $admins = AdminUser::all();
 
-            return;
+        foreach ($admins as $admin) {
+            if (!$admin->peer_id) {
+                Log::error('ID администратора не указан');
+                return;
+            }
+            try {
+                $this->vk->messages()->send($this->accessToken, [
+                    'peer_id' => $admin->peer_id,
+                    'message' => $message,
+                    'random_id' => random_int(1, 1000000),
+                    'parse_mode' => 'markdown',
+                ]);
+            } catch (\Exception $e) {
+                Log::error('Ошибка отправки сообщения админу: ' . $e->getMessage());
+            }
         }
 
-        try {
-            $this->vk->messages()->send($this->accessToken, [
-                'peer_id' => $adminId,
-                'message' => $message,
-                'random_id' => random_int(1, 1000000),
-                'parse_mode' => 'markdown',
-            ]);
-        } catch (\Exception $e) {
-            Log::error('Ошибка отправки сообщения админу: ' . $e->getMessage());
-        }
+
     }
 
     /**

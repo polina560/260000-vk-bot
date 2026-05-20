@@ -13,6 +13,7 @@ use MoonShine\MenuManager\MenuItem;
 use Override;
 use App\MoonShine\Resources\TelegramUser\TelegramUserResource;
 use App\MoonShine\Resources\UserLog\UserLogResource;
+use App\MoonShine\Resources\AdminUser\AdminUserResource;
 
 final class MoonShineLayout extends AppLayout
 {
@@ -38,6 +39,7 @@ final class MoonShineLayout extends AppLayout
             MenuItem::make(TextResource::class),
             MenuItem::make(TelegramUserResource::class, 'Пользователи телеграм'),
             MenuItem::make(UserLogResource::class, 'Логи ползователей'),
+            MenuItem::make(AdminUserResource::class, 'Администраторы'),
         ];
     }
 

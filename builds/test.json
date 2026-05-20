@@ -2,9 +2,9 @@
     "_comment": "php artisan moonshine:build test.json",
     "resources": [
         {
-            "name": "User Logs",
-            "menuName": "Логи ползователей",
-            "table": "user_logs",
+            "name": "Admin User",
+            "menuName": "Администраторы",
+            "table": "admin_user",
             "timestamps": true,
 
             "withMigration": true,
@@ -23,26 +23,9 @@
                     "nullable": true
                 },
                 {
-                    "column": "type",
+                    "column": "peer_id",
                     "type": "string",
                     "nullable": true
-                },
-                {
-                    "column": "description",
-                    "type": "text",
-                    "nullable": true
-                },
-                {
-                    "column": "date",
-                    "type": "timestamp",
-                    "nullable": true
-                },
-                {
-                    "column": "telegram_user_id",
-                    "type": "BelongsTo",
-                    "relation": {
-                        "table" : "telegram_users"
-                    }
                 }
             ]
         }

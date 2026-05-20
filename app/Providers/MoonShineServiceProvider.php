@@ -15,6 +15,7 @@ use MoonShine\Laravel\DependencyInjection\MoonShine;
 use MoonShine\Laravel\DependencyInjection\MoonShineConfigurator;
 use App\MoonShine\Resources\TelegramUser\TelegramUserResource;
 use App\MoonShine\Resources\UserLog\UserLogResource;
+use App\MoonShine\Resources\AdminUser\AdminUserResource;
 
 class MoonShineServiceProvider extends ServiceProvider
 {
@@ -32,6 +33,7 @@ class MoonShineServiceProvider extends ServiceProvider
                 TextResource::class,
                 TelegramUserResource::class,
                 UserLogResource::class,
+                AdminUserResource::class,
             ])
             ->pages([
                 ...$config->getPages(),
