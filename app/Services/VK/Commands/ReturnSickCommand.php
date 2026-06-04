@@ -146,7 +146,7 @@ class ReturnSickCommand extends BaseCommand
 
         $this->sendMessage(
             'Напиши дату выхода с больничного в формате ДД.ММ',
-            $this->getBackKeyboard(),
+            $this->getBackKeyboard(CommandType::ReturnSick->value),
             $peerId
         );
     }
@@ -184,7 +184,7 @@ class ReturnSickCommand extends BaseCommand
 
                 $this->sendMessage(
                     "Напиши дату выхода с больничного в формате ДД.ММ\n\nНапример: 15.05",
-                    $this->getBackKeyboard(),
+                    $this->getBackKeyboard(CommandType::ReturnSick->value),
                     $chat_id
                 );
 
@@ -234,7 +234,7 @@ class ReturnSickCommand extends BaseCommand
         // Показываем главное меню
         $this->sendMessage(
             'Готово! Информация о выходе с больничного передана руководству.',
-            $this->getKeyboardStart(),
+            $this->getMainKeyboard(),
             $chat_id
         );
     }
@@ -251,7 +251,7 @@ class ReturnSickCommand extends BaseCommand
         if (!preg_match('/^(0[1-9]|[12][0-9]|3[01])\.(0[1-9]|1[0-2])$/', $text)) {
             $this->sendMessage(
                 "❌ Неверный формат. Введи дату в формате ДД.ММ\n\nНапример: 15.05",
-                $this->getBackKeyboard(),
+                $this->getBackKeyboard(CommandType::ReturnSick->value),
                 $chat_id
             );
 
@@ -265,7 +265,7 @@ class ReturnSickCommand extends BaseCommand
         if (!checkdate((int) $month, (int) $day, (int) $year)) {
             $this->sendMessage(
                 '❌ Такой даты не существует. Попробуй снова.',
-                $this->getBackKeyboard(),
+                $this->getBackKeyboard(CommandType::ReturnSick->value),
                 $chat_id
             );
 
@@ -279,7 +279,7 @@ class ReturnSickCommand extends BaseCommand
         if ($inputDate < $today) {
             $this->sendMessage(
                 '❌ Дата должна быть сегодня или позже.',
-                $this->getBackKeyboard(),
+                $this->getBackKeyboard(CommandType::ReturnSick->value),
                 $chat_id
             );
 
@@ -311,7 +311,7 @@ class ReturnSickCommand extends BaseCommand
         // Показываем главное меню
         $this->sendMessage(
             'Готово! Информация о выходе с больничного передана руководству.',
-            $this->getKeyboardStart(),
+            $this->getMainKeyboard(),
             $chat_id
         );
     }
@@ -328,34 +328,6 @@ class ReturnSickCommand extends BaseCommand
         $log->description = $description;
         $log->date = now();
         $log->save();
-    }
-
-    /**
-     * Отправка сообщения администратору с Markdown
-     */
-    private function sendToAdminWithMarkdown(string $message): void
-    {
-        //        $adminId = config('services.vk.admin_id');
-
-        $admins = AdminUser::all();
-
-        foreach ($admins as $admin) {
-            if (!$admin->peer_id) {
-                Log::error('ID администратора не указан');
-
-                return;
-            }
-            try {
-                $this->vk->messages()->send($this->accessToken, [
-                    'peer_id' => $admin->peer_id,
-                    'message' => $message,
-                    'random_id' => random_int(1, 1000000),
-                    'parse_mode' => 'markdown',
-                ]);
-            } catch (\Exception $e) {
-                Log::error('Ошибка отправки сообщения админу: '.$e->getMessage());
-            }
-        }
     }
 
 
@@ -419,104 +391,4 @@ class ReturnSickCommand extends BaseCommand
         return json_encode($keyboard, JSON_UNESCAPED_UNICODE);
     }
 
-    /**
-     * Клавиатура для возврата назад
-     */
-    private function getBackKeyboard(): string
-    {
-        $keyboard = [
-            'buttons' => [
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '◀️ Назад',
-                            'payload' => json_encode(['command' => 'return_sick', 'text' => 'back']),
-                        ],
-                        'color' => 'secondary',
-                    ],
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🏠 Главное меню',
-                            'payload' => json_encode(['command' => 'start']),
-                        ],
-                        'color' => 'secondary',
-                    ],
-                ],
-            ],
-            'one_time' => false,
-        ];
-
-        return json_encode($keyboard, JSON_UNESCAPED_UNICODE);
-    }
-
-    /**
-     * Клавиатура главного меню
-     */
-    private function getKeyboardStart(): string
-    {
-        return json_encode([
-            'buttons' => [
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🚗 Опоздание',
-                            'payload' => json_encode(['command' => 'delay']),
-                        ],
-                        'color' => 'primary',
-                    ],
-
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '📅 Изменения в расписании',
-                            'payload' => json_encode(['command' => 'schedule']),
-                        ],
-                        'color' => 'primary',
-                    ],
-
-                ],
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🤒 Заболел',
-                            'payload' => json_encode(['command' => 'sick']),
-                        ],
-                        'color' => 'negative',
-                    ],
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🏥 Выхожу с больничного',
-                            'payload' => json_encode(['command' => 'return-sick']),
-                        ],
-                        'color' => 'positive',
-                    ],
-
-                ],
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '⚠️ Форс-мажор',
-                            'payload' => json_encode(['command' => 'force-majeure']),
-                        ],
-                        'color' => 'negative',
-                    ],
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '💬 Другое',
-                            'payload' => json_encode(['command' => 'other']),
-                        ],
-                        'color' => 'secondary',
-                    ],
-                ],
-            ],
-            'one_time' => false,
-        ], JSON_UNESCAPED_UNICODE);
-    }
 }

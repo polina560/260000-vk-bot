@@ -87,7 +87,7 @@ class OtherCommand extends BaseCommand
 
         $this->sendMessage(
             'Укажи, что хочешь сообщить:',
-            $this->getBackKeyboard(),
+            $this->getBackKeyboard(CommandType::Other->value),
             $peerId
         );
     }
@@ -102,7 +102,7 @@ class OtherCommand extends BaseCommand
         if (empty($text)) {
             $this->sendMessage(
                 '❌ Пожалуйста, напиши своё сообщение:',
-                $this->getBackKeyboard(),
+                $this->getBackKeyboard(CommandType::Other->value),
                 $peerId
             );
 
@@ -112,7 +112,7 @@ class OtherCommand extends BaseCommand
         if (strlen($text) > 200) {
             $this->sendMessage(
                 '❌ Ошибка! Текст слишком длинный, сократи его (до 200 символов):',
-                $this->getBackKeyboard(),
+                $this->getBackKeyboard(CommandType::Other->value),
                 $peerId
             );
 
@@ -131,7 +131,7 @@ class OtherCommand extends BaseCommand
 
         $this->sendMessage(
             $reply,
-            $this->getConfirmKeyboard(),
+            $this->getConfirmKeyboard(CommandType::Other->value),
             $peerId
         );
     }
@@ -164,7 +164,7 @@ class OtherCommand extends BaseCommand
 
             $this->sendMessage(
                 'Готово! Информация передана руководству.',
-                $this->getKeyboardStart(),
+                $this->getMainKeyboard(),
                 $peerId
             );
 
@@ -178,7 +178,7 @@ class OtherCommand extends BaseCommand
 
             $this->sendMessage(
                 'Хорошо, напиши сообщение заново:',
-                $this->getBackKeyboard(),
+                $this->getBackKeyboard(CommandType::Other->value),
                 $peerId
             );
 
@@ -187,7 +187,7 @@ class OtherCommand extends BaseCommand
 
         $this->sendMessage(
             'Напиши *Да* для подтверждения или *Исправить*, чтобы внести правки.',
-            $this->getConfirmKeyboard(),
+            $this->getConfirmKeyboard(CommandType::Other->value),
             $peerId
         );
     }
@@ -212,7 +212,7 @@ class OtherCommand extends BaseCommand
 
         $this->sendMessage(
             'Укажи, что хочешь сообщить:',
-            $this->getBackKeyboard(),
+            $this->getBackKeyboard(CommandType::Other->value),
             $peerId
         );
     }
@@ -231,155 +231,5 @@ class OtherCommand extends BaseCommand
         $log->save();
     }
 
-    /**
-     * Отправка сообщения администратору с Markdown
-     */
-    private function sendToAdminWithMarkdown(string $message): void
-    {
-        //        $adminId = config('services.vk.admin_id');
 
-        $admins = AdminUser::all();
-
-        foreach ($admins as $admin) {
-            if (!$admin->peer_id) {
-                Log::error('ID администратора не указан');
-
-                return;
-            }
-            try {
-                $this->vk->messages()->send($this->accessToken, [
-                    'peer_id' => $admin->peer_id,
-                    'message' => $message,
-                    'random_id' => random_int(1, 1000000),
-                    'parse_mode' => 'markdown',
-                ]);
-            } catch (\Exception $e) {
-                Log::error('Ошибка отправки сообщения админу: '.$e->getMessage());
-            }
-        }
-    }
-
-
-    /**
-     * Клавиатура с кнопкой "Назад"
-     */
-    private function getBackKeyboard(): string
-    {
-        return json_encode([
-            'buttons' => [
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '◀️ Назад',
-                            'payload' => json_encode(['command' => 'other', 'text' => 'назад'], JSON_UNESCAPED_UNICODE),
-                        ],
-                        'color' => 'secondary',
-                    ],
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🏠 Главное меню',
-                            'payload' => json_encode(['command' => 'start'], JSON_UNESCAPED_UNICODE),
-                        ],
-                        'color' => 'secondary',
-                    ],
-                ],
-            ],
-            'one_time' => false,
-        ], JSON_UNESCAPED_UNICODE);
-    }
-
-    /**
-     * Клавиатура подтверждения
-     */
-    private function getConfirmKeyboard(): string
-    {
-        return json_encode([
-            'buttons' => [
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🚗 Опоздание',
-                            'payload' => json_encode(['command' => 'delay']),
-                        ],
-                        'color' => 'primary',
-                    ],
-
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '📅 Изменения в расписании',
-                            'payload' => json_encode(['command' => 'schedule']),
-                        ],
-                        'color' => 'primary',
-                    ],
-
-                ],
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🤒 Заболел',
-                            'payload' => json_encode(['command' => 'sick']),
-                        ],
-                        'color' => 'negative',
-                    ],
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🏥 Выхожу с больничного',
-                            'payload' => json_encode(['command' => 'return-sick']),
-                        ],
-                        'color' => 'positive',
-                    ],
-
-                ],
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '⚠️ Форс-мажор',
-                            'payload' => json_encode(['command' => 'force-majeure']),
-                        ],
-                        'color' => 'negative',
-                    ],
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '💬 Другое',
-                            'payload' => json_encode(['command' => 'other']),
-                        ],
-                        'color' => 'secondary',
-                    ],
-                ],
-            ],
-            'one_time' => false,
-        ], JSON_UNESCAPED_UNICODE);
-    }
-
-    /**
-     * Главное меню
-     */
-    private function getKeyboardStart(): string
-    {
-        return json_encode([
-            'buttons' => [
-                [
-                    ['action' => ['type' => 'text', 'label' => '🚗 Опоздание', 'payload' => json_encode(['command' => 'delay'], JSON_UNESCAPED_UNICODE)], 'color' => 'primary'],
-                    ['action' => ['type' => 'text', 'label' => '🤒 Заболел', 'payload' => json_encode(['command' => 'sick'], JSON_UNESCAPED_UNICODE)], 'color' => 'secondary'],
-                ],
-                [
-                    ['action' => ['type' => 'text', 'label' => '🏥 Выхожу с больничного', 'payload' => json_encode(['command' => 'return-sick'], JSON_UNESCAPED_UNICODE)], 'color' => 'positive'],
-                    ['action' => ['type' => 'text', 'label' => '📅 Изменения в расписании', 'payload' => json_encode(['command' => 'schedule'], JSON_UNESCAPED_UNICODE)], 'color' => 'primary'],
-                ],
-                [
-                    ['action' => ['type' => 'text', 'label' => '⚠️ Форс-мажор', 'payload' => json_encode(['command' => 'force-majeure'], JSON_UNESCAPED_UNICODE)], 'color' => 'negative'],
-                    ['action' => ['type' => 'text', 'label' => '💬 Другое', 'payload' => json_encode(['command' => 'other'], JSON_UNESCAPED_UNICODE)], 'color' => 'primary'],
-                ],
-            ],
-            'one_time' => false,
-        ], JSON_UNESCAPED_UNICODE);
-    }
 }

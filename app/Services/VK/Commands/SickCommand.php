@@ -43,57 +43,29 @@ class SickCommand extends BaseCommand
         $prevState = $user->prev_state;
         $data = $user->getUserData();
 
-        Log::info('SickCommand', [
-            'user_id' => $telegram_id,
-            'state' => $state,
-            'prev_state' => $prevState,
-            'text' => $text,
-            'data' => $data,
-        ]);
+//        Log::info('SickCommand', [
+//            'user_id' => $telegram_id,
+//            'state' => $state,
+//            'prev_state' => $prevState,
+//            'text' => $text,
+//            'data' => $data,
+//        ]);
 
-        // Обработка кнопки "Назад"
+        $textLower = mb_strtolower($text);
+        if ($textLower === 'главное меню' || $textLower === 'меню' || $textLower === 'start') {
+            $this->resetUserState($user);
+            $startCommand = $this->commandFactory->make('start', $chat_id, $telegram_id, null);
+            if ($startCommand) {
+                $startCommand->execute();
+            }
+
+            return;
+        }
+
         if (mb_strtolower($text) === 'назад') {
-            if ($prevState === UserState::SickWaitDays->value) {
-                $user->state = UserState::SickWaitDays->value;
-                $user->prev_state = UserState::None->value;
-                $user->save();
+            $this->handleBack($user, $prevState, $chat_id, $data);
 
-                $this->sendMessage(
-                    '📅 Подскажи, ориентировочно сколько дней ты будешь отсутствовать?',
-                    $this->getBackKeyboard(),
-                    $chat_id
-                );
-
-                return;
-            }
-
-            if ($prevState === UserState::SickWaitRemote->value) {
-                $user->state = UserState::SickWaitRemote->value;
-                $user->prev_state = UserState::None->value;
-                $user->save();
-
-                $this->sendMessage(
-                    '💻 Будет ли возможность работать из дома?',
-                    $this->getRemoteWorkKeyboard(),
-                    $chat_id
-                );
-
-                return;
-            }
-
-            if ($prevState === UserState::SickWaitComment->value) {
-                $user->state = UserState::SickWaitComment->value;
-                $user->prev_state = UserState::None->value;
-                $user->save();
-
-                $this->sendMessage(
-                    '💬 Если хочешь, добавь комментарий (или нажми "Пропустить"):',
-                    $this->getCommentKeyboard(),
-                    $chat_id
-                );
-
-                return;
-            }
+            return;
         }
 
         // Обработка в зависимости от состояния
@@ -122,8 +94,8 @@ class SickCommand extends BaseCommand
                 $user->save();
 
                 $this->sendMessage(
-                    '📅 Подскажи, ориентировочно сколько дней ты будешь отсутствовать?',
-                    $this->getBackKeyboard(),
+                    'Подскажи, ориентировочно сколько дней ты будешь отсутствовать?',
+                    $this->getBackKeyboard(CommandType::Sick->value),
                     $chat_id
                 );
                 break;
@@ -140,7 +112,7 @@ class SickCommand extends BaseCommand
         if (empty($text)) {
             $this->sendMessage(
                 '❌ Пожалуйста, укажи количество дней:',
-                $this->getBackKeyboard(),
+                $this->getBackKeyboard(CommandType::Sick->value),
                 $chat_id
             );
 
@@ -152,7 +124,7 @@ class SickCommand extends BaseCommand
             if (mb_strlen($text) > 50) {
                 $this->sendMessage(
                     '❌ Ошибка! Слишком много символов, сократи сообщение.',
-                    $this->getBackKeyboard(),
+                    $this->getBackKeyboard(CommandType::Sick->value),
                     $chat_id
                 );
 
@@ -160,7 +132,7 @@ class SickCommand extends BaseCommand
             }
             $this->sendMessage(
                 '❌ Ошибка! Укажи количество дней числом (например: 5):',
-                $this->getBackKeyboard(),
+                $this->getBackKeyboard(CommandType::Sick->value),
                 $chat_id
             );
 
@@ -172,7 +144,7 @@ class SickCommand extends BaseCommand
         if ($days < 1 || $days > 99) {
             $this->sendMessage(
                 '❌ Ошибка! Укажи число от 1 до 99:',
-                $this->getBackKeyboard(),
+                $this->getBackKeyboard(CommandType::Sick->value),
                 $chat_id
             );
 
@@ -229,7 +201,7 @@ class SickCommand extends BaseCommand
         $user->save();
 
         $this->sendMessage(
-            '💬 Если хочешь, добавь комментарий (или нажми "Пропустить"):',
+            'Если хочешь, добавь комментарий (или нажми "Пропустить"):',
             $this->getCommentKeyboard(),
             $chat_id
         );
@@ -263,17 +235,17 @@ class SickCommand extends BaseCommand
         $user->data = $data;
         $user->save();
 
-        $reply = "📋 *Проверь информацию:*\n\n";
-        $reply .= "📅 Дней отсутствия: `{$data['days']}`\n";
-        $reply .= "💻 Работа из дома: `{$data['remote']}`\n";
+        $reply = "Проверь информацию:\n\n";
+        $reply .= "Дней отсутствия: `{$data['days']}`\n";
+        $reply .= "Работа из дома: `{$data['remote']}`\n";
         if (!empty($data['comment'])) {
-            $reply .= "💬 Комментарий: `{$data['comment']}`\n";
+            $reply .= "Комментарий: `{$data['comment']}`\n";
         }
-        $reply .= "\n✅ Все верно? Напиши 'Да' или 'Исправить'";
+        $reply .= "\nВсе верно? Напиши 'Да' или 'Исправить'";
 
         $this->sendMessage(
             $reply,
-            $this->getConfirmKeyboard(),
+            $this->getConfirmKeyboard(CommandType::Sick->value),
             $chat_id
         );
     }
@@ -300,7 +272,7 @@ class SickCommand extends BaseCommand
             $msg .= "Дней отсутствия: `{$data['days']}`\n";
             $msg .= "Работа из дома: `{$data['remote']}`\n";
             if (!empty($data['comment'])) {
-                $msg .= "💬 Комментарий: `{$data['comment']}`\n";
+                $msg .= "Комментарий: `{$data['comment']}`\n";
             }
 
             // Отправляем администратору
@@ -322,7 +294,7 @@ class SickCommand extends BaseCommand
             // Показываем главное меню
             $this->sendMessage(
                 'Готово! Информация о больничном передана руководству.',
-                $this->getKeyboardStart(),
+                $this->getMainKeyboard(),
                 $chat_id
             );
 
@@ -336,7 +308,7 @@ class SickCommand extends BaseCommand
 
             $this->sendMessage(
                 'Начнем заново. Сколько дней будешь отсутствовать?',
-                $this->getBackKeyboard(),
+                $this->getBackKeyboard(CommandType::Sick->value),
                 $chat_id
             );
 
@@ -344,12 +316,76 @@ class SickCommand extends BaseCommand
         } else {
             $this->sendMessage(
                 "Напиши 'Да' для подтверждения или 'Исправить', чтобы внести исправления.",
-                $this->getConfirmKeyboard(),
+                $this->getConfirmKeyboard(CommandType::Sick->value),
                 $chat_id
             );
 
             return;
         }
+    }
+
+    /**
+     * Обработка кнопки "Назад"
+     */
+    private function handleBack(TelegramUser $user, string $prevState, int $peerId, array $data): void
+    {
+        match ($prevState) {
+            UserState::SickWaitDays->value   => $this->handleBackFromDays($user, $peerId, $data),
+            UserState::SickWaitRemote->value => $this->handleBackFromRemote($user, $peerId, $data),
+            UserState::SickWaitComment->value => $this->handleBackFromComment($user, $peerId, $data),
+            default                          => null, // или $this->startSickFlow(...)
+        };
+    }
+
+    /**
+     * Возврат из ввода количества дней
+     */
+    private function handleBackFromDays(TelegramUser $user, int $peerId, array $data): void
+    {
+        $user->state = UserState::SickWaitDays->value;
+        $user->prev_state = UserState::None->value;
+        $user->data = $data;
+        $user->save();
+
+        $this->sendMessage(
+            'Подскажи, ориентировочно сколько дней ты будешь отсутствовать?',
+            $this->getBackKeyboard(CommandType::Sick->value),
+            $peerId
+        );
+    }
+
+    /**
+     * Возврат из вопроса о возможности удалённой работы
+     */
+    private function handleBackFromRemote(TelegramUser $user, int $peerId, array $data): void
+    {
+        $user->state = UserState::SickWaitRemote->value;
+        $user->prev_state = UserState::None->value;
+        $user->data = $data;
+        $user->save();
+
+        $this->sendMessage(
+            '💻 Будет ли возможность работать из дома?',
+            $this->getRemoteWorkKeyboard(),
+            $peerId
+        );
+    }
+
+    /**
+     * Возврат из ввода комментария
+     */
+    private function handleBackFromComment(TelegramUser $user, int $peerId, array $data): void
+    {
+        $user->state = UserState::SickWaitComment->value;
+        $user->prev_state = UserState::None->value;
+        $user->data = $data;
+        $user->save();
+
+        $this->sendMessage(
+            'Если хочешь, добавь комментарий (или нажми "Пропустить"):',
+            $this->getCommentKeyboard(),
+            $peerId
+        );
     }
 
     /**
@@ -364,16 +400,6 @@ class SickCommand extends BaseCommand
         $log->description = $description;
         $log->date = now();
         $log->save();
-    }
-
-    /**
-     * Получение имени пользователя
-     */
-    private function getUserName(): string
-    {
-        $userInfo = $this->getUserInfo();
-
-        return ($userInfo['first_name'] ?? 'Пользователь').' '.($userInfo['last_name'] ?? '');
     }
 
     /**
@@ -480,172 +506,5 @@ class SickCommand extends BaseCommand
         return json_encode($keyboard, JSON_UNESCAPED_UNICODE);
     }
 
-    /**
-     * Клавиатура для возврата назад
-     */
-    private function getBackKeyboard(): string
-    {
-        $keyboard = [
-            'buttons' => [
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '◀️ Назад',
-                            'payload' => json_encode(['command' => 'sick', 'text' => 'назад']),
-                        ],
-                        'color' => 'secondary',
-                    ],
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🏠 Главное меню',
-                            'payload' => json_encode(['command' => 'start']),
-                        ],
-                        'color' => 'secondary',
-                    ],
-                ],
-            ],
-            'one_time' => false,
-        ];
 
-        return json_encode($keyboard, JSON_UNESCAPED_UNICODE);
-    }
-
-    /**
-     * Клавиатура для подтверждения
-     */
-    private function getConfirmKeyboard(): string
-    {
-        $keyboard = [
-            'buttons' => [
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '✅ Да',
-                            'payload' => json_encode(['command' => 'sick', 'text' => 'да']),
-                        ],
-                        'color' => 'positive',
-                    ],
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '✏️ Исправить',
-                            'payload' => json_encode(['command' => 'sick', 'text' => 'исправить']),
-                        ],
-                        'color' => 'negative',
-                    ],
-                ],
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🏠 Главное меню',
-                            'payload' => json_encode(['command' => 'start']),
-                        ],
-                        'color' => 'secondary',
-                    ],
-                ],
-            ],
-            'one_time' => false,
-        ];
-
-        return json_encode($keyboard, JSON_UNESCAPED_UNICODE);
-    }
-
-    /**
-     * Отправка сообщения администратору с Markdown
-     */
-    private function sendToAdminWithMarkdown(string $message): void
-    {
-        $admins = AdminUser::all();
-
-        foreach ($admins as $admin) {
-            if (!$admin->peer_id) {
-                Log::error('ID администратора не указан');
-
-                return;
-            }
-            try {
-                $this->vk->messages()->send($this->accessToken, [
-                    'peer_id' => $admin->peer_id,
-                    'message' => $message,
-                    'random_id' => random_int(1, 1000000),
-                    'parse_mode' => 'markdown',
-                ]);
-            } catch (\Exception $e) {
-                Log::error('Ошибка отправки сообщения админу: '.$e->getMessage());
-            }
-        }
-    }
-
-    /**
-     * Клавиатура главного меню
-     */
-    private function getKeyboardStart(): string
-    {
-        return json_encode([
-            'buttons' => [
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🚗 Опоздание',
-                            'payload' => json_encode(['command' => 'delay']),
-                        ],
-                        'color' => 'primary',
-                    ],
-
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '📅 Изменения в расписании',
-                            'payload' => json_encode(['command' => 'schedule']),
-                        ],
-                        'color' => 'primary',
-                    ],
-
-                ],
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🤒 Заболел',
-                            'payload' => json_encode(['command' => 'sick']),
-                        ],
-                        'color' => 'negative',
-                    ],
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🏥 Выхожу с больничного',
-                            'payload' => json_encode(['command' => 'return-sick']),
-                        ],
-                        'color' => 'positive',
-                    ],
-
-                ],
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '⚠️ Форс-мажор',
-                            'payload' => json_encode(['command' => 'force-majeure']),
-                        ],
-                        'color' => 'negative',
-                    ],
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '💬 Другое',
-                            'payload' => json_encode(['command' => 'other']),
-                        ],
-                        'color' => 'secondary',
-                    ],
-                ],
-            ],
-            'one_time' => false,
-        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
-    }
 }

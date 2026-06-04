@@ -81,17 +81,7 @@ class DelayCommand extends BaseCommand
                 break;
 
             default:
-                // Начало процесса - запрос времени опоздания
-                $user->state = UserState::WaitTime->value;
-                $user->prev_state = UserState::None->value;
-                $user->data = [];
-                $user->save();
-
-                $this->sendMessage(
-                    'Укажи на сколько минут ты опаздываешь:',
-                    $this->getTimeKeyboard(),
-                    $chat_id
-                );
+                $this->startDelayFlow($user, $chat_id);
                 break;
         }
     }
@@ -109,7 +99,7 @@ class DelayCommand extends BaseCommand
     }
 
     /**
-     * Возврат из ввода причины опоздания -> возврат к вводу времени
+     * возврат к вводу времени
      */
     private function handleBackFromReason(TelegramUser $user, int $peerId, array $data): void
     {
@@ -120,31 +110,19 @@ class DelayCommand extends BaseCommand
 
         $this->sendMessage(
             'Укажи на сколько минут ты опаздываешь:',
-            $this->getTimeKeyboard(),
+            $this->getTimeKeyboard(CommandType::Delay->value),
             $peerId
         );
     }
 
     /**
-     * Возврат из ввода времени опоздания -> возврат в начало (главное меню / сброс)
+     * возврат в начало (главное меню / сброс)
      */
     private function handleBackFromTime(TelegramUser $user, int $peerId, array $data): void
     {
-        $user->state = UserState::None->value;
-        $user->prev_state = UserState::WaitTime->value;
-        $user->data = [];
-        $user->save();
-
-        $this->sendMessage(
-            'Главное меню',
-            $this->getKeyboardStart(),
-            $peerId
-        );
+        $this->resetUserState($user);
     }
 
-    /**
-     * Стартовый флоу опоздания (используется в default ветке match)
-     */
     private function startDelayFlow(TelegramUser $user, int $peerId): void
     {
         $user->state = UserState::WaitTime->value;
@@ -154,7 +132,7 @@ class DelayCommand extends BaseCommand
 
         $this->sendMessage(
             'Укажи на сколько минут ты опаздываешь:',
-            $this->getTimeKeyboard(),
+            $this->getTimeKeyboard(CommandType::Delay->value),
             $peerId
         );
     }
@@ -169,7 +147,7 @@ class DelayCommand extends BaseCommand
         if (empty($text)) {
             $this->sendMessage(
                 '❌ Пожалуйста, напиши причину опоздания:',
-                $this->getBackKeyboard(),
+                $this->getBackKeyboard(CommandType::Delay->value),
                 $chat_id
             );
 
@@ -179,7 +157,7 @@ class DelayCommand extends BaseCommand
         if (strlen($text) > 150) {
             $this->sendMessage(
                 '❌ Ошибка! Укажи более краткую причину опоздания (до 150 символов):',
-                $this->getBackKeyboard(),
+                $this->getBackKeyboard(CommandType::Delay->value),
                 $chat_id
             );
 
@@ -200,7 +178,7 @@ class DelayCommand extends BaseCommand
 
         $this->sendMessage(
             $reply,
-            $this->getConfirmKeyboard(),
+            $this->getConfirmKeyboard(CommandType::Delay->value),
             $chat_id
         );
     }
@@ -220,7 +198,7 @@ class DelayCommand extends BaseCommand
 
             $this->sendMessage(
                 'Введите количество минут вручную (числом):',
-                $this->getBackKeyboard(),
+                $this->getBackKeyboard(CommandType::Delay->value),
                 $chat_id
             );
 
@@ -228,51 +206,13 @@ class DelayCommand extends BaseCommand
         }
 
         if (!empty($data['waiting_for_custom'])) {
-            // Очищаем флаг
             unset($data['waiting_for_custom']);
-
-            // Проверка на числовое значение
-            if (!is_numeric($text)) {
-                $this->sendMessage(
-                    '❌ Ошибка! Укажи время опоздания в минутах числом (например: 15):',
-                    $this->getTimeKeyboard(),
-                    $chat_id
-                );
-
-                return;
-            }
-
-            $minutes = (int) $text;
-
-            if ($minutes < 1 || $minutes > 999) {
-                $this->sendMessage(
-                    '❌ Ошибка! Укажи число от 1 до 999 минут:',
-                    $this->getTimeKeyboard(),
-                    $chat_id
-                );
-
-                return;
-            }
-
-            $data['delay_minutes'] = $minutes;
-            $user->prev_state = UserState::WaitTime->value;
-            $user->state = UserState::WaitReason->value;
-            $user->data = $data;
-            $user->save();
-
-            $this->sendMessage(
-                'Укажи причину опоздания:',
-                $this->getBackKeyboard(),
-                $chat_id
-            );
-
-            return;
         }
 
         if (!is_numeric($text)) {
             $this->sendMessage(
                 '❌ Ошибка! Укажи время опоздания в минутах числом (например: 15):',
-                $this->getTimeKeyboard(),
+                $this->getTimeKeyboard(CommandType::Delay->value),
                 $chat_id
             );
 
@@ -284,7 +224,7 @@ class DelayCommand extends BaseCommand
         if ($minutes < 1 || $minutes > 999) {
             $this->sendMessage(
                 '❌ Ошибка! Укажи число от 1 до 999 минут:',
-                $this->getTimeKeyboard(),
+                $this->getTimeKeyboard(CommandType::Delay->value),
                 $chat_id
             );
 
@@ -299,7 +239,7 @@ class DelayCommand extends BaseCommand
 
         $this->sendMessage(
             'Укажи причину опоздания:',
-            $this->getBackKeyboard(),
+            $this->getBackKeyboard(CommandType::Delay->value),
             $chat_id
         );
     }
@@ -333,16 +273,10 @@ class DelayCommand extends BaseCommand
                 ."Причина: `{$data['reason']}`\n";
 
             $this->logDelayEvent($user->id, $description, $username);
-
-            // Очищаем состояние пользователя
-            $user->command = CommandType::None->value;
-            $user->state = UserState::None->value;
-            $user->prev_state = UserState::None->value;
-            $user->data = null;
-            $user->save();
+            $this->resetUserState($user);
 
             // Показываем главное меню
-            $this->sendMessage('Готово! Информация об опоздании передана руководству.', $this->getKeyboardStart(), $chat_id);
+            $this->sendMessage('Готово! Информация об опоздании передана руководству.', $this->getMainKeyboard(), $chat_id);
 
             return;
 
@@ -354,7 +288,7 @@ class DelayCommand extends BaseCommand
 
             $this->sendMessage(
                 'Начнем заново. Укажи на сколько минут ты опаздываешь:',
-                $this->getTimeKeyboard(),
+                $this->getTimeKeyboard(CommandType::Delay->value),
                 $chat_id
             );
 
@@ -362,7 +296,7 @@ class DelayCommand extends BaseCommand
         } else {
             $this->sendMessage(
                 "Напиши 'Да' для подтверждения или 'Исправить', чтобы внести исправления.",
-                $this->getConfirmKeyboard(),
+                $this->getConfirmKeyboard(CommandType::Delay->value),
                 $chat_id
             );
 
@@ -385,36 +319,9 @@ class DelayCommand extends BaseCommand
     }
 
     /**
-     * Отправка сообщения администратору с Markdown
-     */
-    private function sendToAdminWithMarkdown(string $message): void
-    {
-        $admins = AdminUser::all();
-
-        foreach ($admins as $admin) {
-            if (!$admin->peer_id) {
-                Log::error('ID администратора не указан');
-
-                return;
-            }
-            try {
-                $this->vk->messages()->send($this->accessToken, [
-                    'peer_id' => $admin->peer_id,
-                    'message' => $message,
-                    'random_id' => random_int(1, 1000000),
-                    'parse_mode' => 'markdown',
-                ]);
-            } catch (\Exception $e) {
-                Log::error('Ошибка отправки сообщения админу: '.$e->getMessage());
-            }
-        }
-
-    }
-
-    /**
      * Клавиатура с вариантами времени
      */
-    private function getTimeKeyboard(): string
+    private function getTimeKeyboard(string $command): string
     {
         $keyboard = [
             'buttons' => [
@@ -423,7 +330,7 @@ class DelayCommand extends BaseCommand
                         'action' => [
                             'type' => 'text',
                             'label' => '10',
-                            'payload' => json_encode(['command' => 'delay', 'text' => '10']),
+                            'payload' => json_encode(['command' => $command, 'text' => '10']),
                         ],
                         'color' => 'primary',
                     ],
@@ -431,7 +338,7 @@ class DelayCommand extends BaseCommand
                         'action' => [
                             'type' => 'text',
                             'label' => '15',
-                            'payload' => json_encode(['command' => 'delay', 'text' => '15']),
+                            'payload' => json_encode(['command' => $command, 'text' => '15']),
                         ],
                         'color' => 'primary',
                     ],
@@ -439,7 +346,7 @@ class DelayCommand extends BaseCommand
                         'action' => [
                             'type' => 'text',
                             'label' => '30',
-                            'payload' => json_encode(['command' => 'delay', 'text' => '30']),
+                            'payload' => json_encode(['command' => $command, 'text' => '30']),
                         ],
                         'color' => 'primary',
                     ],
@@ -449,7 +356,7 @@ class DelayCommand extends BaseCommand
                         'action' => [
                             'type' => 'text',
                             'label' => '✏️ Своё значение',
-                            'payload' => json_encode(['command' => 'delay', 'text' => 'custom'], JSON_UNESCAPED_UNICODE),
+                            'payload' => json_encode(['command' => $command, 'text' => 'custom'], JSON_UNESCAPED_UNICODE),
                         ],
                         'color' => 'secondary',
                     ],
@@ -459,7 +366,7 @@ class DelayCommand extends BaseCommand
                         'action' => [
                             'type' => 'text',
                             'label' => '◀️ Назад',
-                            'payload' => json_encode(['command' => 'delay', 'text' => 'назад']),
+                            'payload' => json_encode(['command' => $command, 'text' => 'назад']),
                         ],
                         'color' => 'secondary',
                     ],
@@ -479,145 +386,5 @@ class DelayCommand extends BaseCommand
         return json_encode($keyboard, JSON_UNESCAPED_UNICODE);
     }
 
-    /**
-     * Клавиатура для возврата назад
-     */
-    private function getBackKeyboard(): string
-    {
-        $keyboard = [
-            'buttons' => [
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '◀️ Назад',
-                            'payload' => json_encode(['command' => 'delay', 'text' => 'назад']),
-                        ],
-                        'color' => 'secondary',
-                    ],
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🏠 Главное меню',
-                            'payload' => json_encode(['command' => 'start']),
-                        ],
-                        'color' => 'secondary',
-                    ],
-                ],
-            ],
-            'one_time' => false,
-        ];
 
-        return json_encode($keyboard, JSON_UNESCAPED_UNICODE);
-    }
-
-    /**
-     * Клавиатура для подтверждения
-     */
-    private function getConfirmKeyboard(): string
-    {
-        $keyboard = [
-            'buttons' => [
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '✅ Да',
-                            'payload' => json_encode(['command' => 'delay', 'text' => 'да']),
-                        ],
-                        'color' => 'positive',
-                    ],
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '✏️ Исправить',
-                            'payload' => json_encode(['command' => 'delay', 'text' => 'исправить']),
-                        ],
-                        'color' => 'negative',
-                    ],
-                ],
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🏠 Главное меню',
-                            'payload' => json_encode(['command' => 'start']),
-                        ],
-                        'color' => 'secondary',
-                    ],
-                ],
-            ],
-            'one_time' => false,
-        ];
-
-        return json_encode($keyboard, JSON_UNESCAPED_UNICODE);
-    }
-
-    private function getKeyboardStart(): string
-    {
-        $keyboard = [
-            'buttons' => [
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🚗 Опоздание',
-                            'payload' => json_encode(['command' => 'delay']),
-                        ],
-                        'color' => 'primary',
-                    ],
-
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '📅 Изменения в расписании',
-                            'payload' => json_encode(['command' => 'schedule']),
-                        ],
-                        'color' => 'primary',
-                    ],
-
-                ],
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🤒 Заболел',
-                            'payload' => json_encode(['command' => 'sick']),
-                        ],
-                        'color' => 'negative',
-                    ],
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🏥 Выхожу с больничного',
-                            'payload' => json_encode(['command' => 'return-sick']),
-                        ],
-                        'color' => 'positive',
-                    ],
-
-                ],
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '⚠️ Форс-мажор',
-                            'payload' => json_encode(['command' => 'force-majeure']),
-                        ],
-                        'color' => 'negative',
-                    ],
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '💬 Другое',
-                            'payload' => json_encode(['command' => 'other']),
-                        ],
-                        'color' => 'secondary',
-                    ],
-                ],
-            ],
-            'one_time' => false,
-        ];
-
-        return json_encode($keyboard, JSON_UNESCAPED_UNICODE);
-    }
 }

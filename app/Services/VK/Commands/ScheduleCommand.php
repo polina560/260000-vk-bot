@@ -85,8 +85,8 @@ class ScheduleCommand extends BaseCommand
         $user->save();
 
         $this->sendMessage(
-            '📅 Укажи свое новое расписание или то, что изменилось в старом:',
-            $this->getBackKeyboard(),
+            'Укажи свое новое расписание или то, что изменилось в старом:',
+            $this->getBackKeyboard(CommandType::Schedule->value),
             $peerId
         );
     }
@@ -101,7 +101,7 @@ class ScheduleCommand extends BaseCommand
         if (empty($text)) {
             $this->sendMessage(
                 '❌ Опиши, что изменилось в расписании:',
-                $this->getBackKeyboard(),
+                $this->getBackKeyboard(CommandType::Schedule->value),
                 $peerId
             );
             return;
@@ -110,7 +110,7 @@ class ScheduleCommand extends BaseCommand
         if (strlen($text) > 200) {
             $this->sendMessage(
                 '❌ Ошибка! Текст слишком длинный, опиши более кратко (до 200 символов):',
-                $this->getBackKeyboard(),
+                $this->getBackKeyboard(CommandType::Schedule->value),
                 $peerId
             );
             return;
@@ -129,7 +129,7 @@ class ScheduleCommand extends BaseCommand
 
         $this->sendMessage(
             $reply,
-            $this->getConfirmKeyboard(),
+            $this->getConfirmKeyboard(CommandType::Schedule->value),
             $peerId
         );
     }
@@ -162,7 +162,7 @@ class ScheduleCommand extends BaseCommand
 
             $this->sendMessage(
                 'Готово! Информация передана руководству.',
-                $this->getKeyboardStart(),
+                $this->getMainKeyboard(),
                 $peerId
             );
             return;
@@ -175,7 +175,7 @@ class ScheduleCommand extends BaseCommand
 
             $this->sendMessage(
                 'Хорошо, напиши изменения заново:',
-                $this->getBackKeyboard(),
+                $this->getBackKeyboard(CommandType::Schedule->value),
                 $peerId
             );
             return;
@@ -183,7 +183,7 @@ class ScheduleCommand extends BaseCommand
 
         $this->sendMessage(
             "❓ Напиши *Да* для подтверждения или *Исправить*, чтобы внести правки.",
-            $this->getConfirmKeyboard(),
+            $this->getConfirmKeyboard(CommandType::Schedule->value),
             $peerId
         );
     }
@@ -206,21 +206,9 @@ class ScheduleCommand extends BaseCommand
 
         $this->sendMessage(
             'Укажи свое новое расписание или то, что изменилось в старом:',
-            $this->getBackKeyboard(),
+            $this->getBackKeyboard(CommandType::Schedule->value),
             $peerId
         );
-    }
-
-    /**
-     * Сброс состояния пользователя
-     */
-    private function resetUserState(TelegramUser $user): void
-    {
-        $user->command = CommandType::None->value;
-        $user->state = UserState::None->value;
-        $user->prev_state = UserState::None->value;
-        $user->data = null;
-        $user->save();
     }
 
     /**
@@ -237,126 +225,5 @@ class ScheduleCommand extends BaseCommand
         $log->save();
     }
 
-    /**
-     * Отправка сообщения администратору с Markdown
-     */
-    private function sendToAdminWithMarkdown(string $message): void
-    {
-//        $adminId = config('services.vk.admin_id');
 
-        $admins = AdminUser::all();
-
-        foreach ($admins as $admin) {
-            if (!$admin->peer_id) {
-                Log::error('ID администратора не указан');
-                return;
-            }
-            try {
-                $this->vk->messages()->send($this->accessToken, [
-                    'peer_id' => $admin->peer_id,
-                    'message' => $message,
-                    'random_id' => random_int(1, 1000000),
-                    'parse_mode' => 'markdown',
-                ]);
-            } catch (\Exception $e) {
-                Log::error('Ошибка отправки сообщения админу: ' . $e->getMessage());
-            }
-        }
-    }
-
-
-    private function getBackKeyboard(): string
-    {
-        return json_encode([
-            'buttons' => [
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '◀️ Назад',
-                            'payload' => json_encode(['command' => 'schedule', 'text' => 'назад'], JSON_UNESCAPED_UNICODE),
-                        ],
-                        'color' => 'secondary',
-                    ],
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🏠 Главное меню',
-                            'payload' => json_encode(['command' => 'start'], JSON_UNESCAPED_UNICODE),
-                        ],
-                        'color' => 'secondary',
-                    ],
-                ],
-            ],
-            'one_time' => false,
-        ], JSON_UNESCAPED_UNICODE);
-    }
-
-    /**
-     * Получение имени пользователя
-     */
-    private function getUserName(): string
-    {
-        $userInfo = $this->getUserInfo();
-
-        return ($userInfo['first_name'] ?? 'Пользователь') . ' ' . ($userInfo['last_name'] ?? '');
-    }
-
-    private function getConfirmKeyboard(): string
-    {
-        return json_encode([
-            'buttons' => [
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '✅ Да',
-                            'payload' => json_encode(['command' => 'schedule', 'text' => 'да'], JSON_UNESCAPED_UNICODE),
-                        ],
-                        'color' => 'positive',
-                    ],
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '✏️ Исправить',
-                            'payload' => json_encode(['command' => 'schedule', 'text' => 'исправить'], JSON_UNESCAPED_UNICODE),
-                        ],
-                        'color' => 'negative',
-                    ],
-                ],
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🏠 Главное меню',
-                            'payload' => json_encode(['command' => 'start'], JSON_UNESCAPED_UNICODE),
-                        ],
-                        'color' => 'secondary',
-                    ],
-                ],
-            ],
-            'one_time' => false,
-        ], JSON_UNESCAPED_UNICODE);
-    }
-
-    private function getKeyboardStart(): string
-    {
-        return json_encode([
-            'buttons' => [
-                [
-                    ['action' => ['type' => 'text', 'label' => '🚗 Опоздание', 'payload' => json_encode(['command' => 'delay'], JSON_UNESCAPED_UNICODE)], 'color' => 'primary'],
-                    ['action' => ['type' => 'text', 'label' => '🤒 Заболел', 'payload' => json_encode(['command' => 'sick'], JSON_UNESCAPED_UNICODE)], 'color' => 'secondary'],
-                ],
-                [
-                    ['action' => ['type' => 'text', 'label' => '🏥 Выхожу с больничного', 'payload' => json_encode(['command' => 'return-sick'], JSON_UNESCAPED_UNICODE)], 'color' => 'positive'],
-                    ['action' => ['type' => 'text', 'label' => '📅 Изменения в расписании', 'payload' => json_encode(['command' => 'schedule'], JSON_UNESCAPED_UNICODE)], 'color' => 'primary'],
-                ],
-                [
-                    ['action' => ['type' => 'text', 'label' => '⚠️ Форс-мажор', 'payload' => json_encode(['command' => 'force-majeure'], JSON_UNESCAPED_UNICODE)], 'color' => 'negative'],
-                    ['action' => ['type' => 'text', 'label' => '💬 Другое', 'payload' => json_encode(['command' => 'other'], JSON_UNESCAPED_UNICODE)], 'color' => 'primary'],
-                ],
-            ],
-            'one_time' => false,
-        ], JSON_UNESCAPED_UNICODE);
-    }
 }

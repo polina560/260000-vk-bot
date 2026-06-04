@@ -4,6 +4,7 @@ namespace App\Services\VK\Commands;
 
 use App\Enums\CommandType;
 use App\Enums\UserState;
+use App\Models\AdminUser;
 use App\Models\TelegramUser;
 use Illuminate\Support\Facades\Log;
 use VK\Client\VKApiClient;
@@ -102,13 +103,180 @@ abstract class BaseCommand
     /**
      * Сброс состояния пользователя
      */
-    public function resetUserState(TelegramUser $user): void
+    protected function resetUserState(TelegramUser $user): void
     {
         $user->command = CommandType::None->value;
         $user->state = UserState::None->value;
         $user->prev_state = UserState::None->value;
         $user->data = null;
         $user->save();
+    }
+
+    /**
+     * Клавиатура главного меню
+     */
+    protected function getMainKeyboard(): string
+    {
+        return json_encode([
+            'buttons' => [
+                [
+                    [
+                        'action' => [
+                            'type' => 'text',
+                            'label' => '🚗 Опоздание',
+                            'payload' => json_encode(['command' => 'delay']),
+                        ],
+                        'color' => 'primary',
+                    ],
+
+                    [
+                        'action' => [
+                            'type' => 'text',
+                            'label' => '📅 Изменения в расписании',
+                            'payload' => json_encode(['command' => 'schedule']),
+                        ],
+                        'color' => 'primary',
+                    ],
+
+                ],
+                [
+                    [
+                        'action' => [
+                            'type' => 'text',
+                            'label' => '🤒 Заболел',
+                            'payload' => json_encode(['command' => 'sick']),
+                        ],
+                        'color' => 'primary',
+                    ],
+                    [
+                        'action' => [
+                            'type' => 'text',
+                            'label' => '🏥 Выхожу с больничного',
+                            'payload' => json_encode(['command' => 'return-sick']),
+                        ],
+                        'color' => 'primary',
+                    ],
+
+                ],
+                [
+                    [
+                        'action' => [
+                            'type' => 'text',
+                            'label' => '⚠️ Форс-мажор',
+                            'payload' => json_encode(['command' => 'force-majeure']),
+                        ],
+                        'color' => 'primary',
+                    ],
+                    [
+                        'action' => [
+                            'type' => 'text',
+                            'label' => '💬 Другое',
+                            'payload' => json_encode(['command' => 'other']),
+                        ],
+                        'color' => 'primary',
+                    ],
+                ],
+            ],
+            'one_time' => false,
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * Клавиатура для возврата назад
+     */
+    protected function getBackKeyboard(string $command): string
+    {
+        $keyboard = [
+            'buttons' => [
+                [
+                    [
+                        'action' => [
+                            'type' => 'text',
+                            'label' => '◀️ Назад',
+                            'payload' => json_encode(['command' => $command, 'text' => 'назад']),
+                        ],
+                        'color' => 'secondary',
+                    ],
+                    [
+                        'action' => [
+                            'type' => 'text',
+                            'label' => '🏠 Главное меню',
+                            'payload' => json_encode(['command' => 'start']),
+                        ],
+                        'color' => 'secondary',
+                    ],
+                ],
+            ],
+            'one_time' => false,
+        ];
+
+        return json_encode($keyboard, JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * Клавиатура для подтверждения
+     */
+    protected function getConfirmKeyboard(string $command): string
+    {
+        $keyboard = [
+            'buttons' => [
+                [
+                    [
+                        'action' => [
+                            'type' => 'text',
+                            'label' => '✅ Да',
+                            'payload' => json_encode(['command' => $command, 'text' => 'да']),
+                        ],
+                        'color' => 'positive',
+                    ],
+                    [
+                        'action' => [
+                            'type' => 'text',
+                            'label' => '✏️ Исправить',
+                            'payload' => json_encode(['command' => $command, 'text' => 'исправить']),
+                        ],
+                        'color' => 'negative',
+                    ],
+                ],
+                [
+                    [
+                        'action' => [
+                            'type' => 'text',
+                            'label' => '🏠 Главное меню',
+                            'payload' => json_encode(['command' => 'start']),
+                        ],
+                        'color' => 'secondary',
+                    ],
+                ],
+            ],
+            'one_time' => false,
+        ];
+
+        return json_encode($keyboard, JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * Отправка сообщения администратору с Markdown
+     */
+    protected function sendToAdminWithMarkdown(string $message): void
+    {
+        foreach (AdminUser::all() as $admin) {
+            if (!$admin->peer_id) {
+                Log::error('ID администратора не указан');
+
+                return;
+            }
+            try {
+                $this->vk->messages()->send($this->accessToken, [
+                    'peer_id' => $admin->peer_id,
+                    'message' => $message,
+                    'random_id' => random_int(1, 1000000),
+                    'parse_mode' => 'markdown',
+                ]);
+            } catch (\Exception $e) {
+                Log::error('Ошибка отправки сообщения админу: '.$e->getMessage());
+            }
+        }
     }
 
 }
