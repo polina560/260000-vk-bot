@@ -174,7 +174,7 @@ class DelayCommand extends BaseCommand
         $reply = "Проверь информацию: \n\n";
         $reply .= 'Опоздание: '.($data['delay_minutes'] ?? '?')." мин\n";
         $reply .= 'Причина: '.$data['reason']."\n\n";
-        $reply .= "Все верно? Напиши 'Да' или 'Исправить'";
+        $reply .= "Все верно? Нажми 'Да' или 'Исправить'";
 
         $this->sendMessage(
             $reply,
@@ -262,7 +262,7 @@ class DelayCommand extends BaseCommand
             // Формируем сообщение для администратора
             $msg = "ОПОЗДАНИЕ\n\n";
             $msg .= "Сотрудник: {$customName}\n";
-            $msg .= "Username: @{$username}\n";
+            $msg .= "Страница ВК: https://vk.com/{$username}\n";
             $msg .= "Опоздание: `{$data['delay_minutes']} мин`\n";
             $msg .= "Причина: `{$data['reason']}`\n";
 

@@ -209,9 +209,9 @@ class ReturnSickCommand extends BaseCommand
         $customName = $user->name;
         $username = $userInfo['screen_name'] ?: ('id'.$user->form_id);
 
-        $msg = "Выход с больничного\n\n";
+        $msg = "ВЫХОД С БОЛНИЧНОГО\n\n";
         $msg .= "Сотрудник: {$customName}\n";
-        $msg .= "Username: @{$username}\n";
+        $msg .= "Страница ВК: https://vk.com/{$username}\n";
         $msg .= "Дата выхода: `{$date}`\n";
         $msg .= 'Время: '.date('d.m.Y H:i:s');
         // Отправляем админу

@@ -308,9 +308,9 @@ class ForceMajeureCommand extends BaseCommand
             $customName = trim(($userInfo['first_name'] ?? '').' '.($userInfo['last_name'] ?? ''));
             $username = $userInfo['screen_name'] ?: ('id'.$userId);
 
-            $msg = "Форс-мажор\n\n";
+            $msg = "ФOРС-МАЖОР\n\n";
             $msg .= "Сотрудник: {$customName}\n";
-            $msg .= "Username: @{$username}\n";
+            $msg .= "Страница ВК: https://vk.com/{$username}\n";
             $msg .= "Тип: `{$data['type']}`\n";
             $msg .= "Длительность: `{$data['duration']}`\n";
             $msg .= "Причина: `{$data['reason']}`\n";

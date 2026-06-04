@@ -150,9 +150,9 @@ class OtherCommand extends BaseCommand
             $customName = trim(($userInfo['first_name'] ?? '').' '.($userInfo['last_name'] ?? ''));
             $username = $userInfo['screen_name'] ?: ('id'.$userId);
 
-            $msg = "Оповещение\n\n";
+            $msg = "ОПОВЕЩЕНИЕ\n\n";
             $msg .= "Сотрудник: {$customName}\n";
-            $msg .= "Username: @{$username}\n";
+            $msg .= "Страница ВК: https://vk.com/{$username}\n";
             $msg .= "Сообщение:\n`{$data['text']}`\n";
 
             $this->sendToAdminWithMarkdown($msg);

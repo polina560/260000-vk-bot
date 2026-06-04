@@ -266,9 +266,9 @@ class SickCommand extends BaseCommand
             $username = $userInfo['screen_name'] ?: ('id'.$telegram_id);
 
             // Формируем сообщение для администратора
-            $msg = "Больничный\n\n";
+            $msg = "БОЛЬНИЧНЫЙ\n\n";
             $msg .= "Сотрудник: {$customName}\n";
-            $msg .= "Username: @{$username}\n";
+            $msg .= "Страница ВК: https://vk.com/{$username}\n";
             $msg .= "Дней отсутствия: `{$data['days']}`\n";
             $msg .= "Работа из дома: `{$data['remote']}`\n";
             if (!empty($data['comment'])) {

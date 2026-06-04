@@ -148,9 +148,9 @@ class ScheduleCommand extends BaseCommand
             $customName = trim(($userInfo['first_name'] ?? '') . ' ' . ($userInfo['last_name'] ?? ''));
             $username = $userInfo['screen_name'] ?: ('id' . $userId);
 
-            $msg = "Изменение в расписании\n\n";
+            $msg = "ИЗМЕНЕНИЕ В РАСПИСАНИИ\n\n";
             $msg .= "Сотрудник: {$customName}\n";
-            $msg .= "Username: @{$username}\n";
+            $msg .= "Страница ВК: https://vk.com/{$username}\n";
             $msg .= "Изменения:\n`{$data['schedule']}`\n";
 
             $this->sendToAdminWithMarkdown($msg);
