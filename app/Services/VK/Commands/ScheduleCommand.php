@@ -49,7 +49,7 @@ class ScheduleCommand extends BaseCommand
             'data' => $data,
         ]);
 
-        // 🔹 Обработка "Главное меню"
+        // Обработка "Главное меню"
         $textLower = mb_strtolower($text);
         if ($textLower === 'главное меню' || $textLower === 'меню' || $textLower === 'start') {
             $this->resetUserState($user);
@@ -60,13 +60,13 @@ class ScheduleCommand extends BaseCommand
             return;
         }
 
-        // 🔹 Обработка кнопки "Назад"
+        // Обработка кнопки "Назад"
         if ($textLower === 'назад') {
             $this->handleBack($user, $prevState, $peerId);
             return;
         }
 
-        // 🔹 FSM: обработка по состояниям
+        // обработка по состояниям
         match ($state) {
             UserState::ScheduleWaitText->value => $this->handleWaitText($user, $text, $data),
             UserState::ScheduleConfirm->value => $this->handleConfirm($user, $text, $data),
@@ -122,10 +122,10 @@ class ScheduleCommand extends BaseCommand
         $user->data = $data;
         $user->save();
 
-        $reply = "📋 Проверь информацию:\n\n";
-        $reply .= "📅 Изменения в расписании:\n";
-        $reply .= $data['schedule'] . "\n\n";
-        $reply .= "✅ Все верно? Напиши *Да* или *Исправить*";
+        $reply = "Проверь информацию:\n\n";
+        $reply .= "Изменения в расписании:\n";
+        $reply .= 'Изменения:' . $data['schedule'] . "\n\n";
+        $reply .= "Все верно? Напиши *Да* или *Исправить*";
 
         $this->sendMessage(
             $reply,
@@ -148,10 +148,10 @@ class ScheduleCommand extends BaseCommand
             $customName = trim(($userInfo['first_name'] ?? '') . ' ' . ($userInfo['last_name'] ?? ''));
             $username = $userInfo['screen_name'] ?: ('id' . $userId);
 
-            $msg = "🚨 Изменение в расписании\n\n";
-            $msg .= "👤 Сотрудник: {$customName}\n";
-            $msg .= "📱 Username: @{$username}\n";
-            $msg .= "📅 Изменения:\n`{$data['schedule']}`\n";
+            $msg = "Изменение в расписании\n\n";
+            $msg .= "Сотрудник: {$customName}\n";
+            $msg .= "Username: @{$username}\n";
+            $msg .= "Изменения:\n`{$data['schedule']}`\n";
 
             $this->sendToAdminWithMarkdown($msg);
 
@@ -161,7 +161,7 @@ class ScheduleCommand extends BaseCommand
             $this->resetUserState($user);
 
             $this->sendMessage(
-                '✅ Готово! Информация передана руководству.',
+                'Готово! Информация передана руководству.',
                 $this->getKeyboardStart(),
                 $peerId
             );
@@ -174,7 +174,7 @@ class ScheduleCommand extends BaseCommand
             $user->save();
 
             $this->sendMessage(
-                '🔄 Хорошо, напиши изменения заново:',
+                'Хорошо, напиши изменения заново:',
                 $this->getBackKeyboard(),
                 $peerId
             );
@@ -205,7 +205,7 @@ class ScheduleCommand extends BaseCommand
         $user->save();
 
         $this->sendMessage(
-            '📅 Укажи свое новое расписание или то, что изменилось в старом:',
+            'Укажи свое новое расписание или то, что изменилось в старом:',
             $this->getBackKeyboard(),
             $peerId
         );
@@ -264,8 +264,6 @@ class ScheduleCommand extends BaseCommand
         }
     }
 
-
-    // 🔽 КЛАВИАТУРЫ (VK Format) 🔽
 
     private function getBackKeyboard(): string
     {

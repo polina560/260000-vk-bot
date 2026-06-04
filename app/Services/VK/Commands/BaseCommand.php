@@ -2,6 +2,9 @@
 
 namespace App\Services\VK\Commands;
 
+use App\Enums\CommandType;
+use App\Enums\UserState;
+use App\Models\TelegramUser;
 use Illuminate\Support\Facades\Log;
 use VK\Client\VKApiClient;
 
@@ -84,6 +87,28 @@ abstract class BaseCommand
             'screen_name' => '',
             'link' => "https://vk.com/id{$this->fromId}",
         ];
+    }
+
+    /**
+     * Получение имени пользователя
+     */
+    protected function getUserName(): string
+    {
+        $userInfo = $this->getUserInfo();
+
+        return ($userInfo['first_name'] ?? 'Пользователь').' '.($userInfo['last_name'] ?? '');
+    }
+
+    /**
+     * Сброс состояния пользователя
+     */
+    public function resetUserState(TelegramUser $user): void
+    {
+        $user->command = CommandType::None->value;
+        $user->state = UserState::None->value;
+        $user->prev_state = UserState::None->value;
+        $user->data = null;
+        $user->save();
     }
 
 }

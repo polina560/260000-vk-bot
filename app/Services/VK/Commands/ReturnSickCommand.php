@@ -32,11 +32,11 @@ class ReturnSickCommand extends BaseCommand
 
         // Проверяем, что команда именно ReturnSick
         if ($user->command !== CommandType::ReturnSick->value && $user->state !== UserState::None->value) {
-            Log::warning('ReturnSickCommand: пользователь в другой команде', [
-                'user_id' => $telegram_id,
-                'current_command' => $user->command,
-                'current_state' => $user->state,
-            ]);
+//            Log::warning('ReturnSickCommand: пользователь в другой команде', [
+//                'user_id' => $telegram_id,
+//                'current_command' => $user->command,
+//                'current_state' => $user->state,
+//            ]);
 
             return;
         }
@@ -54,43 +54,29 @@ class ReturnSickCommand extends BaseCommand
         $prevState = $user->prev_state;
         $data = $user->getUserData();
 
-        Log::info('ReturnSickCommand', [
-            'user_id' => $telegram_id,
-            'state' => $state,
-            'prev_state' => $prevState,
-            'text' => $text,
-            'data' => $data,
-        ]);
+//        Log::info('ReturnSickCommand', [
+//            'user_id' => $telegram_id,
+//            'state' => $state,
+//            'prev_state' => $prevState,
+//            'text' => $text,
+//            'data' => $data,
+//        ]);
 
-        // Обработка кнопки "Назад"
-        if ($text === 'back') {
-            if ($prevState === UserState::ReturnSickWaitData->value) {
-                $user->state = UserState::ReturnSickWaitData->value;
-                $user->prev_state = UserState::None->value;
-                $user->save();
-
-                $this->sendMessage(
-                    '📅 Укажи дату выхода с больничного:',
-                    $this->getDateKeyboard(),
-                    $chat_id
-                );
-
-                return;
+        $textLower = mb_strtolower($text);
+        if ($textLower === 'главное меню' || $textLower === 'меню' || $textLower === 'start') {
+            $this->resetUserState($user);
+            $startCommand = $this->commandFactory->make('start', $chat_id, $telegram_id, null);
+            if ($startCommand) {
+                $startCommand->execute();
             }
 
-            if ($prevState === UserState::ReturnSickWaitManualDate->value) {
-                $user->state = UserState::ReturnSickWaitManualDate->value;
-                $user->prev_state = UserState::None->value;
-                $user->save();
+            return;
+        }
 
-                $this->sendMessage(
-                    '📝 Напиши дату выхода с больничного в формате ДД.ММ',
-                    $this->getBackKeyboard(),
-                    $chat_id
-                );
+        if (mb_strtolower($text) === 'back') {
+            $this->handleBack($user, $prevState, $chat_id, $data);
 
-                return;
-            }
+            return;
         }
 
         // Обработка в зависимости от состояния
@@ -111,12 +97,58 @@ class ReturnSickCommand extends BaseCommand
                 $user->save();
 
                 $this->sendMessage(
-                    '📅 Укажи дату выхода с больничного:',
+                    'Укажи дату выхода с больничного:',
                     $this->getDateKeyboard(),
                     $chat_id
                 );
                 break;
         }
+    }
+
+    /**
+     * Обработка кнопки "Назад"
+     */
+    private function handleBack(TelegramUser $user, string $prevState, int $peerId, array $data): void
+    {
+        match ($prevState) {
+            UserState::ReturnSickWaitData->value       => $this->handleBackFromWaitData($user, $peerId, $data),
+            UserState::ReturnSickWaitManualDate->value => $this->handleBackFromManualDate($user, $peerId, $data),
+            default                                    => null,
+        };
+    }
+
+    /**
+     * Возврат из ожидания даты выхода с больничного (кнопки)
+     */
+    private function handleBackFromWaitData(TelegramUser $user, int $peerId, array $data): void
+    {
+        $user->state = UserState::ReturnSickWaitData->value;
+        $user->prev_state = UserState::None->value;
+        $user->data = $data;
+        $user->save();
+
+        $this->sendMessage(
+            'Укажи дату выхода с больничного:',
+            $this->getDateKeyboard(),
+            $peerId
+        );
+    }
+
+    /**
+     * Возврат из ожидания ручного ввода даты
+     */
+    private function handleBackFromManualDate(TelegramUser $user, int $peerId, array $data): void
+    {
+        $user->state = UserState::ReturnSickWaitManualDate->value;
+        $user->prev_state = UserState::None->value;
+        $user->data = $data;
+        $user->save();
+
+        $this->sendMessage(
+            'Напиши дату выхода с больничного в формате ДД.ММ',
+            $this->getBackKeyboard(),
+            $peerId
+        );
     }
 
     /**
@@ -151,7 +183,7 @@ class ReturnSickCommand extends BaseCommand
                 $user->save();
 
                 $this->sendMessage(
-                    "📝 Напиши дату выхода с больничного в формате ДД.ММ\n\nНапример: 15.05",
+                    "Напиши дату выхода с больничного в формате ДД.ММ\n\nНапример: 15.05",
                     $this->getBackKeyboard(),
                     $chat_id
                 );
@@ -177,11 +209,11 @@ class ReturnSickCommand extends BaseCommand
         $customName = $user->name;
         $username = $userInfo['screen_name'] ?: ('id'.$user->form_id);
 
-        $msg = "🚨 *Выход с больничного*\n\n";
-        $msg .= "👤 Сотрудник: {$customName}\n";
-        $msg .= "📱 Username: @{$username}\n";
-        $msg .= "📅 Дата выхода: `{$date}`\n";
-        $msg .= '🕐 Время: '.date('d.m.Y H:i:s');
+        $msg = "Выход с больничного\n\n";
+        $msg .= "Сотрудник: {$customName}\n";
+        $msg .= "Username: @{$username}\n";
+        $msg .= "Дата выхода: `{$date}`\n";
+        $msg .= 'Время: '.date('d.m.Y H:i:s');
         // Отправляем админу
         $this->sendToAdminWithMarkdown($msg);
 
@@ -201,7 +233,7 @@ class ReturnSickCommand extends BaseCommand
 
         // Показываем главное меню
         $this->sendMessage(
-            '✅ Готово! Информация о выходе с больничного передана руководству.',
+            'Готово! Информация о выходе с больничного передана руководству.',
             $this->getKeyboardStart(),
             $chat_id
         );
@@ -259,10 +291,10 @@ class ReturnSickCommand extends BaseCommand
         $customName = $user->name;
         $username = $userInfo['screen_name'] ?: ('id'.$user->form_id);
 
-        $msg = "🚨 Выход с больничного\n\n";
-        $msg .= "👤 Сотрудник: {$customName}\n";
-        $msg .= "📱 Username: @{$username}\n";
-        $msg .= "📅 Дата выхода: `{$date}`\n";
+        $msg = "Выход с больничного\n\n";
+        $msg .= "Сотрудник: {$customName}\n";
+        $msg .= "Username: @{$username}\n";
+        $msg .= "Дата выхода: `{$date}`\n";
         // Отправляем админу
         $this->sendToAdminWithMarkdown($msg);
 
@@ -278,7 +310,7 @@ class ReturnSickCommand extends BaseCommand
 
         // Показываем главное меню
         $this->sendMessage(
-            '✅ Готово! Информация о выходе с больничного передана руководству.',
+            'Готово! Информация о выходе с больничного передана руководству.',
             $this->getKeyboardStart(),
             $chat_id
         );
@@ -289,10 +321,10 @@ class ReturnSickCommand extends BaseCommand
      */
     private function logReturnSickEvent(int $userId, string $description, string $username): void
     {
-        $log = new UserLog();
+        $log = new UserLog;
         $log->name = $username;
         $log->telegram_user_id = $userId;
-        $log->type = "Выход с больничного";
+        $log->type = 'Выход с больничного';
         $log->description = $description;
         $log->date = now();
         $log->save();
@@ -303,13 +335,14 @@ class ReturnSickCommand extends BaseCommand
      */
     private function sendToAdminWithMarkdown(string $message): void
     {
-//        $adminId = config('services.vk.admin_id');
+        //        $adminId = config('services.vk.admin_id');
 
         $admins = AdminUser::all();
 
         foreach ($admins as $admin) {
             if (!$admin->peer_id) {
                 Log::error('ID администратора не указан');
+
                 return;
             }
             try {
@@ -320,21 +353,11 @@ class ReturnSickCommand extends BaseCommand
                     'parse_mode' => 'markdown',
                 ]);
             } catch (\Exception $e) {
-                Log::error('Ошибка отправки сообщения админу: ' . $e->getMessage());
+                Log::error('Ошибка отправки сообщения админу: '.$e->getMessage());
             }
         }
     }
 
-
-    /**
-     * Получение имени пользователя
-     */
-    private function getUserName(): string
-    {
-        $userInfo = $this->getUserInfo();
-
-        return ($userInfo['first_name'] ?? 'Пользователь').' '.($userInfo['last_name'] ?? '');
-    }
 
     /**
      * Клавиатура выбора даты
@@ -347,7 +370,7 @@ class ReturnSickCommand extends BaseCommand
                     [
                         'action' => [
                             'type' => 'callback',
-                            'label' => '📅 Сегодня',
+                            'label' => 'Сегодня',
                             'payload' => json_encode(['command' => 'return-sick', 'text' => 'today']),
                         ],
                         'color' => 'primary',
@@ -355,7 +378,7 @@ class ReturnSickCommand extends BaseCommand
                     [
                         'action' => [
                             'type' => 'callback',
-                            'label' => '📅 Завтра',
+                            'label' => 'Завтра',
                             'payload' => json_encode(['command' => 'return-sick', 'text' => 'tomorrow']),
                         ],
                         'color' => 'primary',
@@ -365,7 +388,7 @@ class ReturnSickCommand extends BaseCommand
                     [
                         'action' => [
                             'type' => 'callback',
-                            'label' => '✏️ Выбрать дату вручную',
+                            'label' => 'Выбрать дату вручную',
                             'payload' => json_encode(['command' => 'return-sick', 'text' => 'manual']),
                         ],
                         'color' => 'secondary',
@@ -433,7 +456,7 @@ class ReturnSickCommand extends BaseCommand
      */
     private function getKeyboardStart(): string
     {
-        $keyboard = [
+        return json_encode([
             'buttons' => [
                 [
                     [
@@ -444,24 +467,7 @@ class ReturnSickCommand extends BaseCommand
                         ],
                         'color' => 'primary',
                     ],
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🤒 Заболел',
-                            'payload' => json_encode(['command' => 'sick']),
-                        ],
-                        'color' => 'secondary',
-                    ],
-                ],
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🏥 Выхожу с больничного',
-                            'payload' => json_encode(['command' => 'return-sick']),
-                        ],
-                        'color' => 'positive',
-                    ],
+
                     [
                         'action' => [
                             'type' => 'text',
@@ -470,6 +476,26 @@ class ReturnSickCommand extends BaseCommand
                         ],
                         'color' => 'primary',
                     ],
+
+                ],
+                [
+                    [
+                        'action' => [
+                            'type' => 'text',
+                            'label' => '🤒 Заболел',
+                            'payload' => json_encode(['command' => 'sick']),
+                        ],
+                        'color' => 'negative',
+                    ],
+                    [
+                        'action' => [
+                            'type' => 'text',
+                            'label' => '🏥 Выхожу с больничного',
+                            'payload' => json_encode(['command' => 'return-sick']),
+                        ],
+                        'color' => 'positive',
+                    ],
+
                 ],
                 [
                     [
@@ -486,13 +512,11 @@ class ReturnSickCommand extends BaseCommand
                             'label' => '💬 Другое',
                             'payload' => json_encode(['command' => 'other']),
                         ],
-                        'color' => 'primary',
+                        'color' => 'secondary',
                     ],
                 ],
             ],
             'one_time' => false,
-        ];
-
-        return json_encode($keyboard, JSON_UNESCAPED_UNICODE);
+        ], JSON_UNESCAPED_UNICODE);
     }
 }

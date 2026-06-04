@@ -3,12 +3,10 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\TelegramUser;
 use App\Services\VK\VkCallbackHandler;
 use Barryvdh\Debugbar\Facades\Debugbar;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
-use VK\Client\VKApiClient;
+
 
 class VkBotController extends Controller
 {
@@ -60,12 +58,11 @@ class VkBotController extends Controller
                 $message->attachments ?? []
             );
         } elseif ($data && $data->type === 'message_event') {
-            // 🔥 message_event имеет плоскую структуру в object
-            $event = $data->object;  // ← не $event->message, а сразу $event
+            $event = $data->object;
 
             $this->handler->handleCallbackEvent(
-                $event->event_id ?? null,              // ← из $event, не $message
-                $event->user_id ?? null,               // ← user_id, не from_id
+                $event->event_id ?? null,
+                $event->user_id ?? null,
                 $event->peer_id ?? null,
                 $event->payload ?? null,
                 $event->conversation_message_id ?? null

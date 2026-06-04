@@ -35,9 +35,9 @@ final class MoonShineLayout extends AppLayout
     {
         return [
             ...parent::menu(),
-            MenuItem::make(UserResource::class),
-            MenuItem::make(TextResource::class),
-            MenuItem::make(TelegramUserResource::class, 'Пользователи телеграм'),
+//            MenuItem::make(UserResource::class),
+//            MenuItem::make(TextResource::class),
+            MenuItem::make(TelegramUserResource::class, 'Пользователи ВК'),
             MenuItem::make(UserLogResource::class, 'Логи ползователей'),
             MenuItem::make(AdminUserResource::class, 'Администраторы'),
         ];

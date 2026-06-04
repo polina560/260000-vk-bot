@@ -41,42 +41,29 @@ class DelayCommand extends BaseCommand
         $prevState = $user->prev_state;
         $data = $user->getUserData();
 
-        Log::info('DelayCommand', [
-            'user_id' => $telegram_id,
-            'state' => $state,
-            'prev_state' => $prevState,
-            'text' => $text,
-            'data' => $data,
-        ]);
+        //        Log::info('DelayCommand', [
+        //            'user_id' => $telegram_id,
+        //            'state' => $state,
+        //            'prev_state' => $prevState,
+        //            'text' => $text,
+        //            'data' => $data,
+        //        ]);
 
+        $textLower = mb_strtolower($text);
+        if ($textLower === 'главное меню' || $textLower === 'меню' || $textLower === 'start') {
+            $this->resetUserState($user);
+            $startCommand = $this->commandFactory->make('start', $chat_id, $telegram_id, null);
+            if ($startCommand) {
+                $startCommand->execute();
+            }
 
-        // Обработка кнопки "Назад"
+            return;
+        }
+
         if (mb_strtolower($text) === 'назад') {
-            if ($prevState === UserState::WaitReason->value) {
-                $user->state = UserState::WaitReason->value;
-                $user->prev_state = UserState::WaitTime->value;
-                $user->save();
-                $this->sendMessage(
-                    '📝 Укажи причину опоздания:',
-                    $this->getBackKeyboard(),
-                    $chat_id
-                );
+            $this->handleBack($user, $prevState, $chat_id, $data);
 
-                return;
-            }
-
-            if ($prevState === UserState::WaitTime->value) {
-                $user->state = UserState::WaitTime->value;
-                $user->prev_state = UserState::None->value;
-                $user->save();
-                $this->sendMessage(
-                    '⏰ Укажи на сколько минут ты опаздываешь:',
-                    $this->getTimeKeyboard(),
-                    $chat_id
-                );
-
-                return;
-            }
+            return;
         }
 
         // Обработка в зависимости от состояния
@@ -101,7 +88,7 @@ class DelayCommand extends BaseCommand
                 $user->save();
 
                 $this->sendMessage(
-                    '⏰ Укажи на сколько минут ты опаздываешь:',
+                    'Укажи на сколько минут ты опаздываешь:',
                     $this->getTimeKeyboard(),
                     $chat_id
                 );
@@ -110,13 +97,66 @@ class DelayCommand extends BaseCommand
     }
 
     /**
-     * Получение имени пользователя
+     * Обработка кнопки "Назад"
      */
-    private function getUserName(): string
+    private function handleBack(TelegramUser $user, string $prevState, int $peerId, array $data): void
     {
-        $userInfo = $this->getUserInfo();
+        match ($prevState) {
+            UserState::WaitReason->value => $this->handleBackFromReason($user, $peerId, $data),
+            UserState::WaitTime->value => $this->handleBackFromTime($user, $peerId, $data),
+            default => $this->startDelayFlow($user, $peerId),
+        };
+    }
 
-        return ($userInfo['first_name'] ?? 'Пользователь') . ' ' . ($userInfo['last_name'] ?? '');
+    /**
+     * Возврат из ввода причины опоздания -> возврат к вводу времени
+     */
+    private function handleBackFromReason(TelegramUser $user, int $peerId, array $data): void
+    {
+        $user->state = UserState::WaitTime->value;
+        $user->prev_state = UserState::WaitReason->value;
+        $user->data = $data;
+        $user->save();
+
+        $this->sendMessage(
+            'Укажи на сколько минут ты опаздываешь:',
+            $this->getTimeKeyboard(),
+            $peerId
+        );
+    }
+
+    /**
+     * Возврат из ввода времени опоздания -> возврат в начало (главное меню / сброс)
+     */
+    private function handleBackFromTime(TelegramUser $user, int $peerId, array $data): void
+    {
+        $user->state = UserState::None->value;
+        $user->prev_state = UserState::WaitTime->value;
+        $user->data = [];
+        $user->save();
+
+        $this->sendMessage(
+            'Главное меню',
+            $this->getKeyboardStart(),
+            $peerId
+        );
+    }
+
+    /**
+     * Стартовый флоу опоздания (используется в default ветке match)
+     */
+    private function startDelayFlow(TelegramUser $user, int $peerId): void
+    {
+        $user->state = UserState::WaitTime->value;
+        $user->prev_state = UserState::None->value;
+        $user->data = [];
+        $user->save();
+
+        $this->sendMessage(
+            'Укажи на сколько минут ты опаздываешь:',
+            $this->getTimeKeyboard(),
+            $peerId
+        );
     }
 
     /**
@@ -153,10 +193,10 @@ class DelayCommand extends BaseCommand
         $user->data = $data;
         $user->save();
 
-        $reply = "📋 Проверь информацию: \n\n";
-        $reply .= '⏰ Опоздание: ' . ($data['delay_minutes'] ?? '?') . " мин\n";
-        $reply .= '📝 Причина: ' . $data['reason'] . "\n\n";
-        $reply .= "✅ Все верно? Напиши 'Да' или 'Исправить'";
+        $reply = "Проверь информацию: \n\n";
+        $reply .= 'Опоздание: '.($data['delay_minutes'] ?? '?')." мин\n";
+        $reply .= 'Причина: '.$data['reason']."\n\n";
+        $reply .= "Все верно? Напиши 'Да' или 'Исправить'";
 
         $this->sendMessage(
             $reply,
@@ -179,10 +219,11 @@ class DelayCommand extends BaseCommand
             $user->save();
 
             $this->sendMessage(
-                '✍️ Введите количество минут вручную (числом):',
+                'Введите количество минут вручную (числом):',
                 $this->getBackKeyboard(),
                 $chat_id
             );
+
             return;
         }
 
@@ -197,6 +238,7 @@ class DelayCommand extends BaseCommand
                     $this->getTimeKeyboard(),
                     $chat_id
                 );
+
                 return;
             }
 
@@ -208,6 +250,7 @@ class DelayCommand extends BaseCommand
                     $this->getTimeKeyboard(),
                     $chat_id
                 );
+
                 return;
             }
 
@@ -218,10 +261,11 @@ class DelayCommand extends BaseCommand
             $user->save();
 
             $this->sendMessage(
-                '📝 Укажи причину опоздания:',
+                'Укажи причину опоздания:',
                 $this->getBackKeyboard(),
                 $chat_id
             );
+
             return;
         }
 
@@ -231,6 +275,7 @@ class DelayCommand extends BaseCommand
                 $this->getTimeKeyboard(),
                 $chat_id
             );
+
             return;
         }
 
@@ -242,6 +287,7 @@ class DelayCommand extends BaseCommand
                 $this->getTimeKeyboard(),
                 $chat_id
             );
+
             return;
         }
 
@@ -252,7 +298,7 @@ class DelayCommand extends BaseCommand
         $user->save();
 
         $this->sendMessage(
-            '📝 Укажи причину опоздания:',
+            'Укажи причину опоздания:',
             $this->getBackKeyboard(),
             $chat_id
         );
@@ -270,24 +316,23 @@ class DelayCommand extends BaseCommand
         if ($textLower === 'да') {
             // Получаем информацию о пользователе
             $userInfo = $this->getUserInfo();
-            $customName = $userInfo['first_name'] . ' ' . $userInfo['last_name'];
-            $username = $userInfo['screen_name'] ?: ('id' . $telegram_id);
+            $customName = $userInfo['first_name'].' '.$userInfo['last_name'];
+            $username = $userInfo['screen_name'] ?: ('id'.$telegram_id);
 
             // Формируем сообщение для администратора
-            $msg = "🚨 ОПОЗДАНИЕ\n\n";
-            $msg .= "👤 Сотрудник: {$customName}\n";
-            $msg .= "📱 Username: @{$username}\n";
-            $msg .= "⏰ Опоздание: `{$data['delay_minutes']} мин`\n";
-            $msg .= "📝 Причина: `{$data['reason']}`\n";
+            $msg = "ОПОЗДАНИЕ\n\n";
+            $msg .= "Сотрудник: {$customName}\n";
+            $msg .= "Username: @{$username}\n";
+            $msg .= "Опоздание: `{$data['delay_minutes']} мин`\n";
+            $msg .= "Причина: `{$data['reason']}`\n";
 
             // Отправляем администратору
             $this->sendToAdminWithMarkdown($msg);
 
             $description = "Опоздание на: `{$data['delay_minutes']} мин`\n"
-                . "Причина: `{$data['reason']}`\n";
+                ."Причина: `{$data['reason']}`\n";
 
             $this->logDelayEvent($user->id, $description, $username);
-
 
             // Очищаем состояние пользователя
             $user->command = CommandType::None->value;
@@ -297,7 +342,7 @@ class DelayCommand extends BaseCommand
             $user->save();
 
             // Показываем главное меню
-            $this->sendMessage('✅ Готово! Информация об опоздании передана руководству.', $this->getKeyboardStart(), $chat_id);
+            $this->sendMessage('Готово! Информация об опоздании передана руководству.', $this->getKeyboardStart(), $chat_id);
 
             return;
 
@@ -308,7 +353,7 @@ class DelayCommand extends BaseCommand
             $user->save();
 
             $this->sendMessage(
-                '🔄 Начнем заново. Укажи на сколько минут ты опаздываешь:',
+                'Начнем заново. Укажи на сколько минут ты опаздываешь:',
                 $this->getTimeKeyboard(),
                 $chat_id
             );
@@ -316,7 +361,7 @@ class DelayCommand extends BaseCommand
             return;
         } else {
             $this->sendMessage(
-                "❓ Напиши 'Да' для подтверждения или 'Исправить', чтобы внести исправления.",
+                "Напиши 'Да' для подтверждения или 'Исправить', чтобы внести исправления.",
                 $this->getConfirmKeyboard(),
                 $chat_id
             );
@@ -344,13 +389,12 @@ class DelayCommand extends BaseCommand
      */
     private function sendToAdminWithMarkdown(string $message): void
     {
-//        $adminId = config('services.vk.admin_id');
-
         $admins = AdminUser::all();
 
         foreach ($admins as $admin) {
             if (!$admin->peer_id) {
                 Log::error('ID администратора не указан');
+
                 return;
             }
             try {
@@ -361,10 +405,9 @@ class DelayCommand extends BaseCommand
                     'parse_mode' => 'markdown',
                 ]);
             } catch (\Exception $e) {
-                Log::error('Ошибка отправки сообщения админу: ' . $e->getMessage());
+                Log::error('Ошибка отправки сообщения админу: '.$e->getMessage());
             }
         }
-
 
     }
 
@@ -523,24 +566,7 @@ class DelayCommand extends BaseCommand
                         ],
                         'color' => 'primary',
                     ],
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🤒 Заболел',
-                            'payload' => json_encode(['command' => 'sick']),
-                        ],
-                        'color' => 'secondary',
-                    ],
-                ],
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🏥 Выхожу с больничного',
-                            'payload' => json_encode(['command' => 'return-sick']),
-                        ],
-                        'color' => 'positive',
-                    ],
+
                     [
                         'action' => [
                             'type' => 'text',
@@ -549,6 +575,26 @@ class DelayCommand extends BaseCommand
                         ],
                         'color' => 'primary',
                     ],
+
+                ],
+                [
+                    [
+                        'action' => [
+                            'type' => 'text',
+                            'label' => '🤒 Заболел',
+                            'payload' => json_encode(['command' => 'sick']),
+                        ],
+                        'color' => 'negative',
+                    ],
+                    [
+                        'action' => [
+                            'type' => 'text',
+                            'label' => '🏥 Выхожу с больничного',
+                            'payload' => json_encode(['command' => 'return-sick']),
+                        ],
+                        'color' => 'positive',
+                    ],
+
                 ],
                 [
                     [
@@ -565,7 +611,7 @@ class DelayCommand extends BaseCommand
                             'label' => '💬 Другое',
                             'payload' => json_encode(['command' => 'other']),
                         ],
-                        'color' => 'primary',
+                        'color' => 'secondary',
                     ],
                 ],
             ],

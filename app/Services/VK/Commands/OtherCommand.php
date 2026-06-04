@@ -48,7 +48,7 @@ class OtherCommand extends BaseCommand
             'data' => $data,
         ]);
 
-        // 🔹 Обработка "Главное меню"
+        // Обработка "Главное меню"
         $textLower = mb_strtolower($text);
         if ($textLower === 'главное меню' || $textLower === 'меню' || $textLower === 'start') {
             $this->resetUserState($user);
@@ -56,16 +56,18 @@ class OtherCommand extends BaseCommand
             if ($startCommand) {
                 $startCommand->execute();
             }
+
             return;
         }
 
-        // 🔹 Обработка кнопки "Назад"
+        // Обработка кнопки "Назад"
         if ($textLower === 'назад') {
             $this->handleBack($user, $prevState, $peerId, $data);
+
             return;
         }
 
-        // 🔹 FSM: обработка по состояниям
+        // обработка по состояниям
         match ($state) {
             UserState::OtherWaitText->value => $this->handleWaitText($user, $text, $data),
             UserState::OtherConfirm->value => $this->handleConfirm($user, $text, $data),
@@ -84,7 +86,7 @@ class OtherCommand extends BaseCommand
         $user->save();
 
         $this->sendMessage(
-            '💬 Укажи, что хочешь сообщить:',
+            'Укажи, что хочешь сообщить:',
             $this->getBackKeyboard(),
             $peerId
         );
@@ -103,6 +105,7 @@ class OtherCommand extends BaseCommand
                 $this->getBackKeyboard(),
                 $peerId
             );
+
             return;
         }
 
@@ -112,6 +115,7 @@ class OtherCommand extends BaseCommand
                 $this->getBackKeyboard(),
                 $peerId
             );
+
             return;
         }
 
@@ -121,9 +125,9 @@ class OtherCommand extends BaseCommand
         $user->data = $data;
         $user->save();
 
-        $reply = "📋 Проверь информацию:\n\n";
-        $reply .= $data['text'] . "\n\n";
-        $reply .= "✅ Все верно? Напиши *Да* или *Исправить*";
+        $reply = "Проверь информацию:\n\n";
+        $reply .= $data['text']."\n\n";
+        $reply .= 'Все верно? Напиши *Да* или *Исправить*';
 
         $this->sendMessage(
             $reply,
@@ -143,13 +147,13 @@ class OtherCommand extends BaseCommand
 
         if ($textLower === 'да') {
             $userInfo = $this->getUserInfo();
-            $customName = trim(($userInfo['first_name'] ?? '') . ' ' . ($userInfo['last_name'] ?? ''));
-            $username = $userInfo['screen_name'] ?: ('id' . $userId);
+            $customName = trim(($userInfo['first_name'] ?? '').' '.($userInfo['last_name'] ?? ''));
+            $username = $userInfo['screen_name'] ?: ('id'.$userId);
 
-            $msg = "ℹ️ *Просто оповещение*\n\n";
-            $msg .= "👤 Сотрудник: {$customName}\n";
-            $msg .= "📱 Username: @{$username}\n";
-            $msg .= "💬 Сообщение:\n`{$data['text']}`\n";
+            $msg = "Оповещение\n\n";
+            $msg .= "Сотрудник: {$customName}\n";
+            $msg .= "Username: @{$username}\n";
+            $msg .= "Сообщение:\n`{$data['text']}`\n";
 
             $this->sendToAdminWithMarkdown($msg);
 
@@ -159,10 +163,11 @@ class OtherCommand extends BaseCommand
             $this->resetUserState($user);
 
             $this->sendMessage(
-                '✅ Готово! Информация передана руководству.',
+                'Готово! Информация передана руководству.',
                 $this->getKeyboardStart(),
                 $peerId
             );
+
             return;
 
         } elseif ($textLower === 'исправить') {
@@ -172,15 +177,16 @@ class OtherCommand extends BaseCommand
             $user->save();
 
             $this->sendMessage(
-                '🔄 Хорошо, напиши сообщение заново:',
+                'Хорошо, напиши сообщение заново:',
                 $this->getBackKeyboard(),
                 $peerId
             );
+
             return;
         }
 
         $this->sendMessage(
-            "❓ Напиши *Да* для подтверждения или *Исправить*, чтобы внести правки.",
+            'Напиши *Да* для подтверждения или *Исправить*, чтобы внести правки.',
             $this->getConfirmKeyboard(),
             $peerId
         );
@@ -194,6 +200,7 @@ class OtherCommand extends BaseCommand
         if ($prevState === UserState::OtherWaitText->value) {
             // Если были в wait_text — возвращаемся к началу
             $this->startOtherFlow($user, $peerId);
+
             return;
         }
 
@@ -204,22 +211,10 @@ class OtherCommand extends BaseCommand
         $user->save();
 
         $this->sendMessage(
-            '💬 Укажи, что хочешь сообщить:',
+            'Укажи, что хочешь сообщить:',
             $this->getBackKeyboard(),
             $peerId
         );
-    }
-
-    /**
-     * Сброс состояния пользователя
-     */
-    private function resetUserState(TelegramUser $user): void
-    {
-        $user->command = CommandType::None->value;
-        $user->state = UserState::None->value;
-        $user->prev_state = UserState::None->value;
-        $user->data = null;
-        $user->save();
     }
 
     /**
@@ -227,10 +222,10 @@ class OtherCommand extends BaseCommand
      */
     private function logOtherEvent(int $userId, string $description, string $username): void
     {
-        $log = new UserLog();
+        $log = new UserLog;
         $log->name = $username;
         $log->telegram_user_id = $userId;
-        $log->type = "Другое";
+        $log->type = 'Другое';
         $log->description = $description;
         $log->date = now();
         $log->save();
@@ -241,13 +236,14 @@ class OtherCommand extends BaseCommand
      */
     private function sendToAdminWithMarkdown(string $message): void
     {
-//        $adminId = config('services.vk.admin_id');
+        //        $adminId = config('services.vk.admin_id');
 
         $admins = AdminUser::all();
 
         foreach ($admins as $admin) {
             if (!$admin->peer_id) {
                 Log::error('ID администратора не указан');
+
                 return;
             }
             try {
@@ -258,23 +254,11 @@ class OtherCommand extends BaseCommand
                     'parse_mode' => 'markdown',
                 ]);
             } catch (\Exception $e) {
-                Log::error('Ошибка отправки сообщения админу: ' . $e->getMessage());
+                Log::error('Ошибка отправки сообщения админу: '.$e->getMessage());
             }
         }
     }
 
-
-    /**
-     * Получение имени пользователя
-     */
-    private function getUserName(): string
-    {
-        $userInfo = $this->getUserInfo();
-
-        return ($userInfo['first_name'] ?? 'Пользователь') . ' ' . ($userInfo['last_name'] ?? '');
-    }
-
-    // 🔽 КЛАВИАТУРЫ (VK Format) 🔽
 
     /**
      * Клавиатура с кнопкой "Назад"
@@ -317,26 +301,55 @@ class OtherCommand extends BaseCommand
                     [
                         'action' => [
                             'type' => 'text',
-                            'label' => '✅ Да',
-                            'payload' => json_encode(['command' => 'other', 'text' => 'да'], JSON_UNESCAPED_UNICODE),
+                            'label' => '🚗 Опоздание',
+                            'payload' => json_encode(['command' => 'delay']),
                         ],
-                        'color' => 'positive',
+                        'color' => 'primary',
                     ],
+
                     [
                         'action' => [
                             'type' => 'text',
-                            'label' => '✏️ Исправить',
-                            'payload' => json_encode(['command' => 'other', 'text' => 'исправить'], JSON_UNESCAPED_UNICODE),
+                            'label' => '📅 Изменения в расписании',
+                            'payload' => json_encode(['command' => 'schedule']),
                         ],
-                        'color' => 'negative',
+                        'color' => 'primary',
                     ],
+
                 ],
                 [
                     [
                         'action' => [
                             'type' => 'text',
-                            'label' => '🏠 Главное меню',
-                            'payload' => json_encode(['command' => 'start'], JSON_UNESCAPED_UNICODE),
+                            'label' => '🤒 Заболел',
+                            'payload' => json_encode(['command' => 'sick']),
+                        ],
+                        'color' => 'negative',
+                    ],
+                    [
+                        'action' => [
+                            'type' => 'text',
+                            'label' => '🏥 Выхожу с больничного',
+                            'payload' => json_encode(['command' => 'return-sick']),
+                        ],
+                        'color' => 'positive',
+                    ],
+
+                ],
+                [
+                    [
+                        'action' => [
+                            'type' => 'text',
+                            'label' => '⚠️ Форс-мажор',
+                            'payload' => json_encode(['command' => 'force-majeure']),
+                        ],
+                        'color' => 'negative',
+                    ],
+                    [
+                        'action' => [
+                            'type' => 'text',
+                            'label' => '💬 Другое',
+                            'payload' => json_encode(['command' => 'other']),
                         ],
                         'color' => 'secondary',
                     ],

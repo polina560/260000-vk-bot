@@ -12,8 +12,11 @@ use VK\Client\VKApiClient;
 class VkCallbackHandler
 {
     protected VKApiClient $vk;
+
     protected string $accessToken;
+
     protected CommandFactory $commandFactory;
+
     protected int $adminId;
 
     public function __construct()
@@ -43,21 +46,15 @@ class VkCallbackHandler
 
     public function handleMessage($peerId, $fromId, $text, $payload = null, $attachments = [])
     {
-        // Проверяем, что сообщение не от администратора
-//        if ($fromId == $this->adminId) {
-//            Log::info('Сообщение от администратора, не обрабатываем');
-//            return;
-//        }
-
         $user = TelegramUser::firstOrCreate(
-            ['form_id' => $fromId],  // Первый параметр: условия поиска
-            [                         // Второй параметр: данные для создания
+            ['form_id' => $fromId],
+            [
                 'name' => $this->getUserName($fromId),
                 'peer_id' => $peerId,
                 'state' => UserState::None->value,
                 'prev_state' => UserState::None->value,
                 'command' => CommandType::Start->value,
-                'data' => []
+                'data' => [],
             ]
         );
 
@@ -66,9 +63,8 @@ class VkCallbackHandler
         Log::info('Начало', [
             'state' => $currentState,
             'command' => $currentCommand,
-            'text' => $text
+            'text' => $text,
         ]);
-
 
         $isMainMenu = false;
         $textLower = mb_strtolower(trim($text));
@@ -77,7 +73,7 @@ class VkCallbackHandler
             $isMainMenu = true;
         }
 
-        // Также проверяем payload
+        // проверяем payload
         if ($payload) {
             $payloadData = json_decode($payload, true);
             $commandFromPayload = $payloadData['command'] ?? $payloadData['action'] ?? '';
@@ -87,11 +83,11 @@ class VkCallbackHandler
         }
 
         if ($isMainMenu) {
-            Log::info('Возврат в главное меню', [
-                'user_id' => $fromId,
-                'previous_state' => $currentState,
-                'previous_command' => $currentCommand
-            ]);
+//            Log::info('Возврат в главное меню', [
+//                'user_id' => $fromId,
+//                'previous_state' => $currentState,
+//                'previous_command' => $currentCommand,
+//            ]);
 
             // Очищаем состояние пользователя
             $user->command = CommandType::None->value;
@@ -105,18 +101,19 @@ class VkCallbackHandler
             if ($startCommand) {
                 $startCommand->execute();
             }
+
             return;
         }
 
         $isPayloadEmpty = empty($payload) || $payload === '{}' || $payload === '""';
 
-        // Если есть активное состояние (не None) И это не нажатие кнопки (или пустой payload)
+        // Если есть активное состояние
         if ($currentState !== UserState::None->value && $isPayloadEmpty) {
-            Log::info('Продолжение диалога', [
-                'state' => $currentState,
-                'command' => $user->command,
-                'text' => $text
-            ]);
+            //            Log::info('Продолжение диалога', [
+            //                'state' => $currentState,
+            //                'command' => $user->command,
+            //                'text' => $text
+            //            ]);
 
             if ($currentCommand && $currentCommand !== CommandType::None->value) {
                 $commandInstance = $this->commandFactory->make(
@@ -127,14 +124,15 @@ class VkCallbackHandler
                 );
                 if ($commandInstance) {
                     $commandInstance->execute();
+
                     return;
                 }
             }
 
-            // ✅ Если команда не найдена, но есть состояние - пробуем определить команду
+            // если команда не найдена, но есть состояние
             $commandByState = CommandType::from($user->command)->value;
             if ($commandByState) {
-                Log::info('Команда определена по состоянию', ['command' => $commandByState]);
+                //                Log::info('Команда определена по состоянию', ['command' => $commandByState]);
                 $commandInstance = $this->commandFactory->make(
                     $commandByState,
                     $peerId,
@@ -143,43 +141,24 @@ class VkCallbackHandler
                 );
                 if ($commandInstance) {
                     $commandInstance->execute();
+
                     return;
                 }
             }
         }
 
-
-        // Обработка нажатий на кнопки (payload)
-//        if ($payload) {
-//            $payloadData = json_decode($payload, true);
-//            $command = $payloadData['command'] ?? $payloadData['action'] ?? '';
-//
-//            Log::info('Обработка кнопки', ['command' => $command]);
-//
-//            $commandInstance = $this->commandFactory->make($command, $peerId, $fromId, $payloadData);
-//            if ($commandInstance) {
-//                $commandInstance->execute();
-//                return;
-//            }
-//        }
-
         if ($payload) {
-            // 🔥 Безопасное декодирование с гарантией типа
             $payloadData = null;
 
             if (is_string($payload)) {
                 $decoded = json_decode($payload, true);
-                // Если декодирование успешно И результат — массив, используем его
                 if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                     $payloadData = $decoded;
                 }
-                // В остальных случаях оставляем $payloadData = null
             } elseif (is_array($payload)) {
-                // Если payload уже пришёл как массив (редко, но бывает)
                 $payloadData = $payload;
             }
 
-            // 🔥 Извлечение команды с поддержкой разных ключей
             $command = '';
             if (is_array($payloadData)) {
                 $command = $payloadData['command']
@@ -188,14 +167,12 @@ class VkCallbackHandler
                     ?? '';
             }
 
-            Log::info('Обработка кнопки', [
-                'command' => $command,
-                'payloadData' => $payloadData,
-                'payload_raw_type' => gettype($payload)
-            ]);
+            //            Log::info('Обработка кнопки', [
+            //                'command' => $command,
+            //                'payloadData' => $payloadData,
+            //                'payload_raw_type' => gettype($payload)
+            //            ]);
 
-            // 🔥 Вызываем фабрику только если команда найдена
-            // $payloadData гарантированно ?array — ошибка типа невозможна
             if ($command) {
                 $commandInstance = $this->commandFactory->make(
                     $command,
@@ -206,17 +183,17 @@ class VkCallbackHandler
 
                 if ($commandInstance) {
                     $commandInstance->execute();
+
                     return;
                 }
             }
         }
 
-
         if ($currentState !== UserState::None->value) {
-            Log::info('Активное состояние, но не обработано ранее', [
-                'state' => $currentState,
-                'command' => $currentCommand
-            ]);
+            //            Log::info('Активное состояние, но не обработано ранее', [
+            //                'state' => $currentState,
+            //                'command' => $currentCommand
+            //            ]);
 
             // Пробуем получить команду по состоянию
             $commandByState = CommandType::from($user->command)->value;
@@ -229,19 +206,19 @@ class VkCallbackHandler
                 );
                 if ($commandInstance) {
                     $commandInstance->execute();
+
                     return;
                 }
             }
         }
 
         // Если ничего не подошло - показываем стартовое меню
-        Log::info('Показываем стартовое меню');
+        //        Log::info('Показываем стартовое меню');
         $startCommand = $this->commandFactory->make('start', $peerId, $fromId, null);
         if ($startCommand) {
             $startCommand->execute();
         }
     }
-
 
     /**
      * Получение имени пользователя по ID
@@ -251,55 +228,19 @@ class VkCallbackHandler
         try {
             $user = $this->vk->users()->get($this->accessToken, [
                 'user_ids' => [$userId],
-                'fields' => ['first_name', 'last_name']
+                'fields' => ['first_name', 'last_name'],
             ]);
 
             if (!empty($user)) {
-                return ($user[0]['first_name'] ?? '') . ' ' . ($user[0]['last_name'] ?? '');
+                return ($user[0]['first_name'] ?? '').' '.($user[0]['last_name'] ?? '');
             }
         } catch (\Exception $e) {
-            Log::error('Ошибка получения имени пользователя: ' . $e->getMessage());
+            Log::error('Ошибка получения имени пользователя: '.$e->getMessage());
         }
 
         return 'Пользователь';
     }
 
-    /**
-     * Парсинг текстовых команд
-     */
-//    protected function parseCommand($text): ?string
-//    {
-//        $textLower = mb_strtolower(trim($text));
-//
-//        $commandsMap = [
-//            'start' => ['/start', 'start', 'начать', 'меню', 'старт', 'привет'],
-//            'help' => ['/help', 'help', 'помощь'],
-//            'about' => ['/about', 'about', 'о нас', 'инфо'],
-//            'support' => ['поддержка', 'support'],
-//        ];
-//
-//        foreach ($commandsMap as $command => $variants) {
-//            if (in_array($textLower, $variants)) {
-//                return $command;
-//            }
-//        }
-//
-//        return null;
-//    }
-
-    /**
-     * Пересылка сообщения администратору
-     */
-    protected function forwardToAdmin($peerId, $fromId, $text, $attachments = [])
-    {
-        $userInfo = $this->getUserInfo($fromId);
-        $adminMessage = $this->formatAdminMessage($userInfo, $text, $attachments);
-
-        $this->sendToAdmin($adminMessage, $attachments);
-
-        // Отправляем подтверждение пользователю
-        $this->sendConfirmationToUser($peerId);
-    }
 
     /**
      * Отправка сообщения администратору
@@ -333,20 +274,8 @@ class VkCallbackHandler
             Log::info('Сообщение отправлено администратору');
 
         } catch (\Exception $e) {
-            Log::error('Ошибка отправки админу: ' . $e->getMessage());
+            Log::error('Ошибка отправки админу: '.$e->getMessage());
         }
-    }
-
-    /**
-     * Отправка подтверждения пользователю
-     */
-    protected function sendConfirmationToUser($peerId): void
-    {
-        $this->vk->messages()->send($this->accessToken, [
-            'peer_id' => $peerId,
-            'message' => "✅ Сообщение отправлено администратору!\n\nОтвет придет в ближайшее время.",
-            'random_id' => random_int(1, 1000000)
-        ]);
     }
 
     /**
@@ -370,7 +299,7 @@ class VkCallbackHandler
                 ];
             }
         } catch (\Exception $e) {
-            Log::error('Ошибка получения информации о пользователе: ' . $e->getMessage());
+            Log::error('Ошибка получения информации о пользователе: '.$e->getMessage());
         }
 
         return [
@@ -393,33 +322,27 @@ class VkCallbackHandler
         $message .= "💬 Сообщение:\n{$text}\n";
 
         if (!empty($attachments)) {
-            $message .= "\n📎 Вложения: " . count($attachments) . " шт.\n";
+            $message .= "\n📎 Вложения: ".count($attachments)." шт.\n";
         }
 
-        $message .= "\n🕐 Время: " . date('d.m.Y H:i:s');
+        $message .= "\n🕐 Время: ".date('d.m.Y H:i:s');
 
         return $message;
     }
 
-
-
     /**
-     * Отправка подтверждения обработки callback-события
-     */
-    /**
-     * Обработка callback-событий от кнопок типа 'callback'
+     * Обработка callback-событий
      */
     public function handleCallbackEvent($eventId, $userId, $peerId, $payload, $conversationMessageId = null)
     {
-        Log::info('Callback event', [
-            'event_id' => $eventId,
-            'user_id' => $userId,
-            'peer_id' => $peerId,
-            'payload_type' => gettype($payload),
-            'payload_raw' => $payload
-        ]);
+        //        Log::info('Callback event', [
+        //            'event_id' => $eventId,
+        //            'user_id' => $userId,
+        //            'peer_id' => $peerId,
+        //            'payload_type' => gettype($payload),
+        //            'payload_raw' => $payload
+        //        ]);
 
-        // 🔥 Универсальное преобразование payload в массив
         $payloadData = $this->normalizePayload($payload);
 
         // Извлекаем команду
@@ -428,10 +351,10 @@ class VkCallbackHandler
             ?? $payloadData['cmd']
             ?? '';
 
-        Log::info('Callback command extracted', [
-            'command' => $command,
-            'payloadData' => $payloadData
-        ]);
+        //        Log::info('Callback command extracted', [
+        //            'command' => $command,
+        //            'payloadData' => $payloadData
+        //        ]);
 
         // Создаём и выполняем команду
         if ($command) {
@@ -447,40 +370,31 @@ class VkCallbackHandler
             }
         }
 
-        // Подтверждаем событие (кнопка перестанет "крутиться")
+        // Подтверждаем событие
         $this->ackCallbackEvent($eventId, $userId, $peerId);
     }
 
-    /**
-     * 🔥 Вспомогательный метод: преобразует любой тип payload в массив
-     */
     private function normalizePayload($payload): array
     {
-        // Уже массив — возвращаем как есть
         if (is_array($payload)) {
             return $payload;
         }
 
-        // Null или пустое — пустой массив
         if (empty($payload)) {
             return [];
         }
 
-        // JSON-строка — декодируем
         if (is_string($payload)) {
             $decoded = json_decode($payload, true);
             if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
                 return $decoded;
             }
-            // Если декодирование не удалось — пробуем как объект ниже
         }
 
-        // Объект stdClass (частый случай из вебхуков) — конвертируем в массив
         if (is_object($payload)) {
             return (array) $payload;
         }
 
-        // Всё остальное — оборачиваем в массив
         return ['text' => (string) $payload];
     }
 
@@ -489,9 +403,8 @@ class VkCallbackHandler
      */
     private function ackCallbackEvent($eventId, $userId, $peerId): void
     {
-        // Если нет event_id — нечего подтверждать
         if (empty($eventId)) {
-            Log::warning('ackCallbackEvent: пустой event_id');
+            //            Log::warning('ackCallbackEvent: пустой event_id');
             return;
         }
 
@@ -502,27 +415,20 @@ class VkCallbackHandler
                 $messages->sendMessageEventAnswer(
                     $this->accessToken,
                     [
-                        'event_id' => (string) $eventId,  // 🔥 гарантируем строку
+                        'event_id' => (string) $eventId,
                         'user_id' => (int) $userId,
                         'peer_id' => (int) $peerId,
-                        // Опционально: показать всплывающее сообщение
-                        // 'event_data' => json_encode([
-                        //     'type' => 'show_snackbar',
-                        //     'text' => '✅ Принято'
-                        // ])
                     ]
                 );
-                Log::debug('Callback ack sent', ['event_id' => $eventId]);
+                //                Log::debug('Callback ack sent', ['event_id' => $eventId]);
             } else {
                 Log::debug('sendMessageEventAnswer не доступен в этой версии VK API');
             }
         } catch (\Exception $e) {
-            // Не критично: даже без ack кнопка со временем перестанет крутиться
-            Log::warning('Ошибка ack callback (не критично)', [
+            Log::warning('Ошибка ack callback', [
                 'event_id' => $eventId,
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ]);
         }
     }
-
 }

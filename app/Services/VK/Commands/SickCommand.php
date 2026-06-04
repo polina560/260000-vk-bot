@@ -51,8 +51,6 @@ class SickCommand extends BaseCommand
             'data' => $data,
         ]);
 
-
-
         // Обработка кнопки "Назад"
         if (mb_strtolower($text) === 'назад') {
             if ($prevState === UserState::SickWaitDays->value) {
@@ -65,6 +63,7 @@ class SickCommand extends BaseCommand
                     $this->getBackKeyboard(),
                     $chat_id
                 );
+
                 return;
             }
 
@@ -78,6 +77,7 @@ class SickCommand extends BaseCommand
                     $this->getRemoteWorkKeyboard(),
                     $chat_id
                 );
+
                 return;
             }
 
@@ -91,6 +91,7 @@ class SickCommand extends BaseCommand
                     $this->getCommentKeyboard(),
                     $chat_id
                 );
+
                 return;
             }
         }
@@ -142,6 +143,7 @@ class SickCommand extends BaseCommand
                 $this->getBackKeyboard(),
                 $chat_id
             );
+
             return;
         }
 
@@ -153,6 +155,7 @@ class SickCommand extends BaseCommand
                     $this->getBackKeyboard(),
                     $chat_id
                 );
+
                 return;
             }
             $this->sendMessage(
@@ -160,10 +163,11 @@ class SickCommand extends BaseCommand
                 $this->getBackKeyboard(),
                 $chat_id
             );
+
             return;
         }
 
-        $days = (int)$text;
+        $days = (int) $text;
 
         if ($days < 1 || $days > 99) {
             $this->sendMessage(
@@ -171,6 +175,7 @@ class SickCommand extends BaseCommand
                 $this->getBackKeyboard(),
                 $chat_id
             );
+
             return;
         }
 
@@ -196,15 +201,15 @@ class SickCommand extends BaseCommand
         $textLower = mb_strtolower($text);
 
         $validOptions = [
-            'yes' ,
-            'mb' ,
-            'no'
+            'yes',
+            'mb',
+            'no',
         ];
 
         $textMessage = [
             'yes' => 'да, буду работать из дома',
             'mb' => 'могу при необходимости',
-            'no' => 'нет возможности/не позволяет состояние работать'
+            'no' => 'нет возможности/не позволяет состояние работать',
         ];
 
         if (!in_array($textLower, $validOptions)) {
@@ -213,6 +218,7 @@ class SickCommand extends BaseCommand
                 $this->getRemoteWorkKeyboard(),
                 $chat_id
             );
+
             return;
         }
 
@@ -246,6 +252,7 @@ class SickCommand extends BaseCommand
                     $this->getCommentKeyboard(),
                     $chat_id
                 );
+
                 return;
             }
             $data['comment'] = $text;
@@ -283,15 +290,15 @@ class SickCommand extends BaseCommand
         if ($textLower === 'да') {
             // Получаем информацию о пользователе
             $userInfo = $this->getUserInfo();
-            $customName = $userInfo['first_name'] . ' ' . $userInfo['last_name'];
-            $username = $userInfo['screen_name'] ?: ('id' . $telegram_id);
+            $customName = $userInfo['first_name'].' '.$userInfo['last_name'];
+            $username = $userInfo['screen_name'] ?: ('id'.$telegram_id);
 
             // Формируем сообщение для администратора
-            $msg = "🚨 НОВЫЙ БОЛЬНИЧНЫЙ\n\n";
-            $msg .= "👤 Сотрудник: {$customName}\n";
-            $msg .= "📱 Username: @{$username}\n";
-            $msg .= "📅 Дней отсутствия: `{$data['days']}`\n";
-            $msg .= "💻 Работа из дома: `{$data['remote']}`\n";
+            $msg = "Больничный\n\n";
+            $msg .= "Сотрудник: {$customName}\n";
+            $msg .= "Username: @{$username}\n";
+            $msg .= "Дней отсутствия: `{$data['days']}`\n";
+            $msg .= "Работа из дома: `{$data['remote']}`\n";
             if (!empty($data['comment'])) {
                 $msg .= "💬 Комментарий: `{$data['comment']}`\n";
             }
@@ -303,7 +310,7 @@ class SickCommand extends BaseCommand
             ."Работа из дома: `{$data['remote']}`\n"
             ."Комментарий: `{$data['comment']}`\n";
 
-         $this->logSickChange($user->id, $description, $username);
+            $this->logSickChange($user->id, $description, $username);
 
             // Очищаем состояние пользователя
             $user->command = CommandType::None->value;
@@ -314,10 +321,11 @@ class SickCommand extends BaseCommand
 
             // Показываем главное меню
             $this->sendMessage(
-                '✅ Готово! Информация о больничном передана руководству.',
+                'Готово! Информация о больничном передана руководству.',
                 $this->getKeyboardStart(),
                 $chat_id
             );
+
             return;
 
         } elseif ($textLower === 'исправить') {
@@ -327,17 +335,19 @@ class SickCommand extends BaseCommand
             $user->save();
 
             $this->sendMessage(
-                '🔄 Начнем заново. Сколько дней будешь отсутствовать?',
+                'Начнем заново. Сколько дней будешь отсутствовать?',
                 $this->getBackKeyboard(),
                 $chat_id
             );
+
             return;
         } else {
             $this->sendMessage(
-                "❓ Напиши 'Да' для подтверждения или 'Исправить', чтобы внести исправления.",
+                "Напиши 'Да' для подтверждения или 'Исправить', чтобы внести исправления.",
                 $this->getConfirmKeyboard(),
                 $chat_id
             );
+
             return;
         }
     }
@@ -347,10 +357,10 @@ class SickCommand extends BaseCommand
      */
     private function logSickChange(int $userId, string $description, string $username): void
     {
-        $log = new UserLog();
+        $log = new UserLog;
         $log->telegram_user_id = $userId;
         $log->name = $username;
-        $log->type = "Болезнь";
+        $log->type = 'Болезнь';
         $log->description = $description;
         $log->date = now();
         $log->save();
@@ -363,8 +373,9 @@ class SickCommand extends BaseCommand
     {
         $userInfo = $this->getUserInfo();
 
-        return ($userInfo['first_name'] ?? 'Пользователь') . ' ' . ($userInfo['last_name'] ?? '');
+        return ($userInfo['first_name'] ?? 'Пользователь').' '.($userInfo['last_name'] ?? '');
     }
+
     /**
      * Клавиатура для выбора работы из дома
      */
@@ -376,52 +387,52 @@ class SickCommand extends BaseCommand
                     [
                         'action' => [
                             'type' => 'text',
-                            'label' => '✅ Да, буду работать из дома',
-                            'payload' => json_encode(['command' => 'sick', 'text' => 'yes'])
+                            'label' => 'Да, буду работать из дома',
+                            'payload' => json_encode(['command' => 'sick', 'text' => 'yes']),
                         ],
-                        'color' => 'positive'
-                    ]
+                        'color' => 'positive',
+                    ],
                 ],
                 [
                     [
                         'action' => [
                             'type' => 'text',
-                            'label' => '🔄 Могу при необходимости',
-                            'payload' => json_encode(['command' => 'sick', 'text' => 'mb'])
+                            'label' => 'Могу при необходимости',
+                            'payload' => json_encode(['command' => 'sick', 'text' => 'mb']),
                         ],
-                        'color' => 'primary'
-                    ]
+                        'color' => 'primary',
+                    ],
                 ],
                 [
                     [
                         'action' => [
                             'type' => 'text',
-                            'label' => '❌ Нет возможности/не позволяет состояние',
-                            'payload' => json_encode(['command' => 'sick', 'text' => 'no'])
+                            'label' => 'Нет возможности/не позволяет состояние',
+                            'payload' => json_encode(['command' => 'sick', 'text' => 'no']),
                         ],
-                        'color' => 'negative'
-                    ]
+                        'color' => 'negative',
+                    ],
                 ],
                 [
                     [
                         'action' => [
                             'type' => 'text',
                             'label' => '◀️ Назад',
-                            'payload' => json_encode(['command' => 'sick', 'text' => 'назад'])
+                            'payload' => json_encode(['command' => 'sick', 'text' => 'назад']),
                         ],
-                        'color' => 'secondary'
+                        'color' => 'secondary',
                     ],
                     [
                         'action' => [
                             'type' => 'text',
                             'label' => '🏠 Главное меню',
-                            'payload' => json_encode(['command' => 'start'])
+                            'payload' => json_encode(['command' => 'start']),
                         ],
-                        'color' => 'secondary'
-                    ]
-                ]
+                        'color' => 'secondary',
+                    ],
+                ],
             ],
-            'one_time' => false
+            'one_time' => false,
         ];
 
         return json_encode($keyboard, JSON_UNESCAPED_UNICODE);
@@ -439,31 +450,31 @@ class SickCommand extends BaseCommand
                         'action' => [
                             'type' => 'text',
                             'label' => '⏭️ Пропустить',
-                            'payload' => json_encode(['command' => 'sick', 'text' => 'пропустить'])
+                            'payload' => json_encode(['command' => 'sick', 'text' => 'пропустить']),
                         ],
-                        'color' => 'secondary'
-                    ]
+                        'color' => 'secondary',
+                    ],
                 ],
                 [
                     [
                         'action' => [
                             'type' => 'text',
                             'label' => '◀️ Назад',
-                            'payload' => json_encode(['command' => 'sick', 'text' => 'назад'])
+                            'payload' => json_encode(['command' => 'sick', 'text' => 'назад']),
                         ],
-                        'color' => 'secondary'
+                        'color' => 'secondary',
                     ],
                     [
                         'action' => [
                             'type' => 'text',
                             'label' => '🏠 Главное меню',
-                            'payload' => json_encode(['command' => 'start'])
+                            'payload' => json_encode(['command' => 'start']),
                         ],
-                        'color' => 'secondary'
-                    ]
-                ]
+                        'color' => 'secondary',
+                    ],
+                ],
             ],
-            'one_time' => false
+            'one_time' => false,
         ];
 
         return json_encode($keyboard, JSON_UNESCAPED_UNICODE);
@@ -481,21 +492,21 @@ class SickCommand extends BaseCommand
                         'action' => [
                             'type' => 'text',
                             'label' => '◀️ Назад',
-                            'payload' => json_encode(['command' => 'sick', 'text' => 'назад'])
+                            'payload' => json_encode(['command' => 'sick', 'text' => 'назад']),
                         ],
-                        'color' => 'secondary'
+                        'color' => 'secondary',
                     ],
                     [
                         'action' => [
                             'type' => 'text',
                             'label' => '🏠 Главное меню',
-                            'payload' => json_encode(['command' => 'start'])
+                            'payload' => json_encode(['command' => 'start']),
                         ],
-                        'color' => 'secondary'
-                    ]
-                ]
+                        'color' => 'secondary',
+                    ],
+                ],
             ],
-            'one_time' => false
+            'one_time' => false,
         ];
 
         return json_encode($keyboard, JSON_UNESCAPED_UNICODE);
@@ -513,31 +524,31 @@ class SickCommand extends BaseCommand
                         'action' => [
                             'type' => 'text',
                             'label' => '✅ Да',
-                            'payload' => json_encode(['command' => 'sick', 'text' => 'да'])
+                            'payload' => json_encode(['command' => 'sick', 'text' => 'да']),
                         ],
-                        'color' => 'positive'
+                        'color' => 'positive',
                     ],
                     [
                         'action' => [
                             'type' => 'text',
                             'label' => '✏️ Исправить',
-                            'payload' => json_encode(['command' => 'sick', 'text' => 'исправить'])
+                            'payload' => json_encode(['command' => 'sick', 'text' => 'исправить']),
                         ],
-                        'color' => 'negative'
-                    ]
+                        'color' => 'negative',
+                    ],
                 ],
                 [
                     [
                         'action' => [
                             'type' => 'text',
                             'label' => '🏠 Главное меню',
-                            'payload' => json_encode(['command' => 'start'])
+                            'payload' => json_encode(['command' => 'start']),
                         ],
-                        'color' => 'secondary'
-                    ]
-                ]
+                        'color' => 'secondary',
+                    ],
+                ],
             ],
-            'one_time' => false
+            'one_time' => false,
         ];
 
         return json_encode($keyboard, JSON_UNESCAPED_UNICODE);
@@ -548,13 +559,12 @@ class SickCommand extends BaseCommand
      */
     private function sendToAdminWithMarkdown(string $message): void
     {
-//        $adminId = config('services.vk.admin_id');
-
         $admins = AdminUser::all();
 
         foreach ($admins as $admin) {
             if (!$admin->peer_id) {
                 Log::error('ID администратора не указан');
+
                 return;
             }
             try {
@@ -565,77 +575,77 @@ class SickCommand extends BaseCommand
                     'parse_mode' => 'markdown',
                 ]);
             } catch (\Exception $e) {
-                Log::error('Ошибка отправки сообщения админу: ' . $e->getMessage());
+                Log::error('Ошибка отправки сообщения админу: '.$e->getMessage());
             }
         }
     }
-
 
     /**
      * Клавиатура главного меню
      */
     private function getKeyboardStart(): string
     {
-        $keyboard = [
+        return json_encode([
             'buttons' => [
                 [
                     [
                         'action' => [
                             'type' => 'text',
                             'label' => '🚗 Опоздание',
-                            'payload' => json_encode(['command' => 'delay'])
+                            'payload' => json_encode(['command' => 'delay']),
                         ],
-                        'color' => 'primary'
+                        'color' => 'primary',
                     ],
+
                     [
                         'action' => [
                             'type' => 'text',
-                            'label' => '🤒 Заболел',
-                            'payload' => json_encode(['command' => 'sick'])
+                            'label' => '📅 Изменения в расписании',
+                            'payload' => json_encode(['command' => 'schedule']),
                         ],
-                        'color' => 'secondary'
-                    ]
+                        'color' => 'primary',
+                    ],
+
                 ],
                 [
                     [
                         'action' => [
                             'type' => 'text',
-                            'label' => '🏥 Выхожу с больничного',
-                            'payload' => json_encode(['command' => 'return-sick'])
+                            'label' => '🤒 Заболел',
+                            'payload' => json_encode(['command' => 'sick']),
                         ],
-                        'color' => 'positive'
+                        'color' => 'negative',
                     ],
                     [
                         'action' => [
                             'type' => 'text',
-                            'label' => '📅 Изменения в расписании',
-                            'payload' => json_encode(['command' => 'schedule'])
+                            'label' => '🏥 Выхожу с больничного',
+                            'payload' => json_encode(['command' => 'return-sick']),
                         ],
-                        'color' => 'primary'
-                    ]
+                        'color' => 'positive',
+                    ],
+
                 ],
                 [
                     [
                         'action' => [
                             'type' => 'text',
                             'label' => '⚠️ Форс-мажор',
-                            'payload' => json_encode(['command' => 'force-majeure'])
+                            'payload' => json_encode(['command' => 'force-majeure']),
                         ],
-                        'color' => 'negative'
+                        'color' => 'negative',
                     ],
                     [
                         'action' => [
                             'type' => 'text',
                             'label' => '💬 Другое',
-                            'payload' => json_encode(['command' => 'other'])
+                            'payload' => json_encode(['command' => 'other']),
                         ],
-                        'color' => 'primary'
-                    ]
-                ]
+                        'color' => 'secondary',
+                    ],
+                ],
             ],
-            'one_time' => false
-        ];
-
-        return json_encode($keyboard, JSON_UNESCAPED_UNICODE);
+            'one_time' => false,
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
     }
 }
