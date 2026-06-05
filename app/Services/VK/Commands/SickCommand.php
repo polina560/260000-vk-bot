@@ -12,16 +12,16 @@ class SickCommand extends BaseCommand
 {
     public function execute(): void
     {
-        $telegram_id = $this->fromId;
-        $chat_id = $this->peerId;
+        $userId = $this->fromId;
+        $peer_id = $this->peerId;
         $text = trim($this->payload['text'] ?? '');
 
         // Получаем или создаем пользователя
         $user = TelegramUser::firstOrCreate(
-            ['form_id' => $telegram_id],
+            ['form_id' => $userId],
             [
                 'name' => $this->getUserName(),
-                'peer_id' => $chat_id,
+                'peer_id' => $peer_id,
                 'state' => UserState::None->value,
                 'command' => CommandType::Sick->value,
                 'prev_state' => UserState::None->value,
@@ -33,8 +33,8 @@ class SickCommand extends BaseCommand
         $user->command = CommandType::Sick->value;
 
         // Обновляем peer_id если изменился
-        if ($user->peer_id != $chat_id) {
-            $user->peer_id = $chat_id;
+        if ($user->peer_id != $peer_id) {
+            $user->peer_id = $peer_id;
         }
         $user->save();
 
@@ -43,7 +43,7 @@ class SickCommand extends BaseCommand
         $data = $user->getUserData();
 
         //        Log::info('SickCommand', [
-        //            'user_id' => $telegram_id,
+        //            'user_id' => $userId,
         //            'state' => $state,
         //            'prev_state' => $prevState,
         //            'text' => $text,
@@ -51,9 +51,9 @@ class SickCommand extends BaseCommand
         //        ]);
 
         $textLower = mb_strtolower($text);
-        if ($textLower === 'главное меню' || $textLower === 'меню' || $textLower === 'start') {
+        if ($textLower === 'start') {
             $this->resetUserState($user);
-            $startCommand = $this->commandFactory->make('start', $chat_id, $telegram_id, null);
+            $startCommand = $this->commandFactory->make('start', $peer_id, $userId, null);
             if ($startCommand) {
                 $startCommand->execute();
             }
@@ -62,12 +62,11 @@ class SickCommand extends BaseCommand
         }
 
         if (mb_strtolower($text) === 'назад') {
-            $this->handleBack($user, $prevState, $chat_id, $data);
+            $this->handleBack($user, $prevState, $peer_id, $data);
 
             return;
         }
 
-        // Обработка в зависимости от состояния
         switch ($state) {
             case UserState::SickWaitDays->value:
                 $this->handleWaitDays($user, $text, $data);
@@ -84,21 +83,24 @@ class SickCommand extends BaseCommand
             case UserState::SickConfirm->value:
                 $this->handleConfirm($user, $text, $data);
                 break;
-
             default:
-                // Начало процесса - запрос количества дней
-                $user->state = UserState::SickWaitDays->value;
-                $user->prev_state = UserState::None->value;
-                $user->data = [];
-                $user->save();
-
-                $this->sendMessage(
-                    'Подскажи, ориентировочно сколько дней ты будешь отсутствовать?',
-                    $this->getBackKeyboard(CommandType::Sick->value),
-                    $chat_id
-                );
+                $this->startSickFlow($user, $peer_id);
                 break;
         }
+    }
+
+    private function startSickFlow(TelegramUser $user, int $peer_id): void
+    {
+        $user->state = UserState::SickWaitDays->value;
+        $user->prev_state = UserState::None->value;
+        $user->data = [];
+        $user->save();
+
+        $this->sendMessage(
+            'Подскажи, ориентировочно сколько дней ты будешь отсутствовать?',
+            $this->getBackKeyboard(CommandType::Sick->value),
+            $peer_id
+        );
     }
 
     /**
@@ -106,13 +108,13 @@ class SickCommand extends BaseCommand
      */
     private function handleWaitDays(TelegramUser $user, string $text, array $data): void
     {
-        $chat_id = $user->peer_id;
+        $peer_id = $user->peer_id;
 
         if (empty($text)) {
             $this->sendMessage(
                 '❌ Пожалуйста, укажи количество дней:',
                 $this->getBackKeyboard(CommandType::Sick->value),
-                $chat_id
+                $peer_id
             );
 
             return;
@@ -124,7 +126,7 @@ class SickCommand extends BaseCommand
                 $this->sendMessage(
                     '❌ Ошибка! Слишком много символов, сократи сообщение.',
                     $this->getBackKeyboard(CommandType::Sick->value),
-                    $chat_id
+                    $peer_id
                 );
 
                 return;
@@ -132,7 +134,7 @@ class SickCommand extends BaseCommand
             $this->sendMessage(
                 '❌ Ошибка! Укажи количество дней числом (например: 5):',
                 $this->getBackKeyboard(CommandType::Sick->value),
-                $chat_id
+                $peer_id
             );
 
             return;
@@ -144,7 +146,7 @@ class SickCommand extends BaseCommand
             $this->sendMessage(
                 '❌ Ошибка! Укажи число от 1 до 99:',
                 $this->getBackKeyboard(CommandType::Sick->value),
-                $chat_id
+                $peer_id
             );
 
             return;
@@ -159,7 +161,7 @@ class SickCommand extends BaseCommand
         $this->sendMessage(
             '💻 Будет ли возможность работать из дома?',
             $this->getRemoteWorkKeyboard(),
-            $chat_id
+            $peer_id
         );
     }
 
@@ -168,7 +170,7 @@ class SickCommand extends BaseCommand
      */
     private function handleWaitRemote(TelegramUser $user, string $text, array $data): void
     {
-        $chat_id = $user->peer_id;
+        $peer_id = $user->peer_id;
         $textLower = mb_strtolower($text);
 
         $validOptions = [
@@ -187,7 +189,7 @@ class SickCommand extends BaseCommand
             $this->sendMessage(
                 '❌ Ошибка! Пожалуйста, выбери вариант из предложенных кнопок:',
                 $this->getRemoteWorkKeyboard(),
-                $chat_id
+                $peer_id
             );
 
             return;
@@ -202,7 +204,7 @@ class SickCommand extends BaseCommand
         $this->sendMessage(
             'Если хочешь, добавь комментарий (или нажми "Пропустить"):',
             $this->getCommentKeyboard(),
-            $chat_id
+            $peer_id
         );
     }
 
@@ -211,7 +213,7 @@ class SickCommand extends BaseCommand
      */
     private function handleWaitComment(TelegramUser $user, string $text, array $data): void
     {
-        $chat_id = $user->peer_id;
+        $peer_id = $user->peer_id;
         $textLower = mb_strtolower($text);
 
         if ($textLower === 'пропустить') {
@@ -221,7 +223,7 @@ class SickCommand extends BaseCommand
                 $this->sendMessage(
                     '❌ Ошибка! Комментарий слишком длинный (максимум 100 символов):',
                     $this->getCommentKeyboard(),
-                    $chat_id
+                    $peer_id
                 );
 
                 return;
@@ -235,17 +237,17 @@ class SickCommand extends BaseCommand
         $user->save();
 
         $reply = "Проверь информацию:\n\n";
-        $reply .= "Дней отсутствия: `{$data['days']}`\n";
-        $reply .= "Работа из дома: `{$data['remote']}`\n";
+        $reply .= "Дней отсутствия: {$data['days']}\n";
+        $reply .= "Работа из дома: {$data['remote']}\n";
         if (!empty($data['comment'])) {
-            $reply .= "Комментарий: `{$data['comment']}`\n";
+            $reply .= "Комментарий: {$data['comment']}\n";
         }
         $reply .= "\nВсе верно? Напиши 'Да' или 'Исправить'";
 
         $this->sendMessage(
             $reply,
             $this->getConfirmKeyboard(CommandType::Sick->value),
-            $chat_id
+            $peer_id
         );
     }
 
@@ -254,32 +256,32 @@ class SickCommand extends BaseCommand
      */
     private function handleConfirm(TelegramUser $user, string $text, array $data): void
     {
-        $chat_id = $user->peer_id;
-        $telegram_id = $user->form_id;
+        $peer_id = $user->peer_id;
+        $userId = $user->form_id;
         $textLower = mb_strtolower(trim($text));
 
         if ($textLower === 'да') {
             // Получаем информацию о пользователе
             $userInfo = $this->getUserInfo();
             $customName = $userInfo['first_name'].' '.$userInfo['last_name'];
-            $username = $userInfo['screen_name'] ?: ('id'.$telegram_id);
+            $username = $userInfo['screen_name'] ?: ('id'.$userId);
 
             // Формируем сообщение для администратора
             $msg = "БОЛЬНИЧНЫЙ\n\n";
             $msg .= "Сотрудник: {$customName}\n";
             $msg .= "Страница ВК: https://vk.com/{$username}\n";
-            $msg .= "Дней отсутствия: `{$data['days']}`\n";
-            $msg .= "Работа из дома: `{$data['remote']}`\n";
+            $msg .= "Дней отсутствия: {$data['days']}\n";
+            $msg .= "Работа из дома: {$data['remote']}\n";
             if (!empty($data['comment'])) {
-                $msg .= "Комментарий: `{$data['comment']}`\n";
+                $msg .= "Комментарий: {$data['comment']}\n";
             }
 
             // Отправляем администратору
-            $this->sendToAdminWithMarkdown($msg);
+            $this->sendToAdminWithMarkdown($msg, $peer_id);
 
-            $description = "Отсутствие (в днях): `{$data['days']}`\n"
-            ."Работа из дома: `{$data['remote']}`\n"
-            ."Комментарий: `{$data['comment']}`\n";
+            $description = "Отсутствие (в днях): {$data['days']}\n"
+            ."Работа из дома: {$data['remote']}\n"
+            ."Комментарий: {$data['comment']}\n";
 
             $this->logSickChange($user->id, $description, $username);
 
@@ -294,7 +296,7 @@ class SickCommand extends BaseCommand
             $this->sendMessage(
                 'Готово! Информация о больничном передана руководству.',
                 $this->getMainKeyboard(),
-                $chat_id
+                $peer_id
             );
 
             return;
@@ -308,7 +310,7 @@ class SickCommand extends BaseCommand
             $this->sendMessage(
                 'Начнем заново. Сколько дней будешь отсутствовать?',
                 $this->getBackKeyboard(CommandType::Sick->value),
-                $chat_id
+                $peer_id
             );
 
             return;
@@ -316,7 +318,7 @@ class SickCommand extends BaseCommand
             $this->sendMessage(
                 "Напиши 'Да' для подтверждения или 'Исправить', чтобы внести исправления.",
                 $this->getConfirmKeyboard(CommandType::Sick->value),
-                $chat_id
+                $peer_id
             );
 
             return;
@@ -339,7 +341,7 @@ class SickCommand extends BaseCommand
     /**
      * Возврат из ввода количества дней
      */
-    private function handleBackFromDays(TelegramUser $user, int $peerId, array $data): void
+    private function handleBackFromDays(TelegramUser $user, int $peer_id, array $data): void
     {
         $user->state = UserState::SickWaitDays->value;
         $user->prev_state = UserState::None->value;
@@ -349,14 +351,14 @@ class SickCommand extends BaseCommand
         $this->sendMessage(
             'Подскажи, ориентировочно сколько дней ты будешь отсутствовать?',
             $this->getBackKeyboard(CommandType::Sick->value),
-            $peerId
+            $peer_id
         );
     }
 
     /**
      * Возврат из вопроса о возможности удалённой работы
      */
-    private function handleBackFromRemote(TelegramUser $user, int $peerId, array $data): void
+    private function handleBackFromRemote(TelegramUser $user, int $peer_id, array $data): void
     {
         $user->state = UserState::SickWaitRemote->value;
         $user->prev_state = UserState::None->value;
@@ -366,14 +368,14 @@ class SickCommand extends BaseCommand
         $this->sendMessage(
             '💻 Будет ли возможность работать из дома?',
             $this->getRemoteWorkKeyboard(),
-            $peerId
+            $peer_id
         );
     }
 
     /**
      * Возврат из ввода комментария
      */
-    private function handleBackFromComment(TelegramUser $user, int $peerId, array $data): void
+    private function handleBackFromComment(TelegramUser $user, int $peer_id, array $data): void
     {
         $user->state = UserState::SickWaitComment->value;
         $user->prev_state = UserState::None->value;
@@ -383,7 +385,7 @@ class SickCommand extends BaseCommand
         $this->sendMessage(
             'Если хочешь, добавь комментарий (или нажми "Пропустить"):',
             $this->getCommentKeyboard(),
-            $peerId
+            $peer_id
         );
     }
 

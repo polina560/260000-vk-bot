@@ -258,13 +258,16 @@ abstract class BaseCommand
     /**
      * Отправка сообщения администратору с Markdown
      */
-    protected function sendToAdminWithMarkdown(string $message): void
+    protected function sendToAdminWithMarkdown(string $message, ?int $peer_id = null): void
     {
         foreach (AdminUser::all() as $admin) {
             if (!$admin->peer_id) {
                 Log::error('ID администратора не указан');
-
                 return;
+            }
+            if ($admin->peer_id == $peer_id) {
+                Log::error('Пользователь является админом');
+                continue;
             }
             try {
                 $this->vk->messages()->send($this->accessToken, [

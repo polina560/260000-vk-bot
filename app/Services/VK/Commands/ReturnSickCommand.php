@@ -4,7 +4,6 @@ namespace App\Services\VK\Commands;
 
 use App\Enums\CommandType;
 use App\Enums\UserState;
-use App\Models\AdminUser;
 use App\Models\TelegramUser;
 use App\Models\UserLog;
 use Illuminate\Support\Facades\Log;
@@ -13,16 +12,16 @@ class ReturnSickCommand extends BaseCommand
 {
     public function execute(): void
     {
-        $telegram_id = $this->fromId;
-        $chat_id = $this->peerId;
+        $userId = $this->fromId;
+        $peer_id = $this->peerId;
         $text = trim($this->payload['text'] ?? '');
 
         // Получаем или создаем пользователя
         $user = TelegramUser::firstOrCreate(
-            ['form_id' => $telegram_id],
+            ['form_id' => $userId],
             [
                 'name' => $this->getUserName(),
-                'peer_id' => $chat_id,
+                'peer_id' => $peer_id,
                 'state' => UserState::None->value,
                 'command' => CommandType::None->value,
                 'prev_state' => UserState::None->value,
@@ -32,11 +31,11 @@ class ReturnSickCommand extends BaseCommand
 
         // Проверяем, что команда именно ReturnSick
         if ($user->command !== CommandType::ReturnSick->value && $user->state !== UserState::None->value) {
-//            Log::warning('ReturnSickCommand: пользователь в другой команде', [
-//                'user_id' => $telegram_id,
-//                'current_command' => $user->command,
-//                'current_state' => $user->state,
-//            ]);
+            //            Log::warning('ReturnSickCommand: пользователь в другой команде', [
+            //                'user_id' => $userId,
+            //                'current_command' => $user->command,
+            //                'current_state' => $user->state,
+            //            ]);
 
             return;
         }
@@ -45,8 +44,8 @@ class ReturnSickCommand extends BaseCommand
         $user->command = CommandType::ReturnSick->value;
 
         // Обновляем peer_id если изменился
-        if ($user->peer_id != $chat_id) {
-            $user->peer_id = $chat_id;
+        if ($user->peer_id != $peer_id) {
+            $user->peer_id = $peer_id;
         }
         $user->save();
 
@@ -54,18 +53,18 @@ class ReturnSickCommand extends BaseCommand
         $prevState = $user->prev_state;
         $data = $user->getUserData();
 
-//        Log::info('ReturnSickCommand', [
-//            'user_id' => $telegram_id,
-//            'state' => $state,
-//            'prev_state' => $prevState,
-//            'text' => $text,
-//            'data' => $data,
-//        ]);
+        //        Log::info('ReturnSickCommand', [
+        //            'user_id' => $userId,
+        //            'state' => $state,
+        //            'prev_state' => $prevState,
+        //            'text' => $text,
+        //            'data' => $data,
+        //        ]);
 
         $textLower = mb_strtolower($text);
-        if ($textLower === 'главное меню' || $textLower === 'меню' || $textLower === 'start') {
+        if ($textLower === 'start') {
             $this->resetUserState($user);
-            $startCommand = $this->commandFactory->make('start', $chat_id, $telegram_id, null);
+            $startCommand = $this->commandFactory->make('start', $peer_id, $userId, null);
             if ($startCommand) {
                 $startCommand->execute();
             }
@@ -73,13 +72,12 @@ class ReturnSickCommand extends BaseCommand
             return;
         }
 
-        if (mb_strtolower($text) === 'back') {
-            $this->handleBack($user, $prevState, $chat_id, $data);
+        if (mb_strtolower($text) === 'назад') {
+            $this->handleBack($user, $prevState, $peer_id, $data);
 
             return;
         }
 
-        // Обработка в зависимости от состояния
         switch ($state) {
             case UserState::ReturnSickWaitData->value:
                 $this->handleWaitData($user, $text, $data);
@@ -90,19 +88,23 @@ class ReturnSickCommand extends BaseCommand
                 break;
 
             default:
-                // Начало процесса - запрос даты
-                $user->state = UserState::ReturnSickWaitData->value;
-                $user->prev_state = UserState::None->value;
-                $user->data = [];
-                $user->save();
-
-                $this->sendMessage(
-                    'Укажи дату выхода с больничного:',
-                    $this->getDateKeyboard(),
-                    $chat_id
-                );
+                $this->startReturnSickFlow($user, $peer_id);
                 break;
         }
+    }
+
+    private function startReturnSickFlow(TelegramUser $user, int $peerId): void
+    {
+        $user->state = UserState::ReturnSickWaitData->value;
+        $user->prev_state = UserState::None->value;
+        $user->data = [];
+        $user->save();
+
+        $this->sendMessage(
+            'Укажи дату выхода с больничного:',
+            $this->getDateKeyboard(),
+            $peerId
+        );
     }
 
     /**
@@ -111,9 +113,9 @@ class ReturnSickCommand extends BaseCommand
     private function handleBack(TelegramUser $user, string $prevState, int $peerId, array $data): void
     {
         match ($prevState) {
-            UserState::ReturnSickWaitData->value       => $this->handleBackFromWaitData($user, $peerId, $data),
+            UserState::ReturnSickWaitData->value => $this->handleBackFromWaitData($user, $peerId, $data),
             UserState::ReturnSickWaitManualDate->value => $this->handleBackFromManualDate($user, $peerId, $data),
-            default                                    => null,
+            default => null,
         };
     }
 
@@ -156,17 +158,9 @@ class ReturnSickCommand extends BaseCommand
      */
     private function handleWaitData(TelegramUser $user, string $text, array $data): void
     {
-        $chat_id = $user->peer_id;
-        $telegram_id = $user->form_id;
+        $peer_id = $user->peer_id;
         $textLower = $text;
-
-        // Получаем выбранную дату
         $date = null;
-
-        Log::info('TEXTLOWER', [
-            'user_id' => $telegram_id,
-            'textLower' => $textLower,
-        ]);
 
         // Проверяем payload для кнопок
         if (isset($textLower)) {
@@ -176,7 +170,6 @@ class ReturnSickCommand extends BaseCommand
             } elseif ($textLower === 'tomorrow') {
                 $date = date('d.m', strtotime('+1 day'));
             } elseif ($textLower === 'manual') {
-                // Переход к ручному вводу
                 $data['prev_state'] = UserState::ReturnSickWaitData->value;
                 $user->state = UserState::ReturnSickWaitManualDate->value;
                 $user->data = $data;
@@ -185,21 +178,18 @@ class ReturnSickCommand extends BaseCommand
                 $this->sendMessage(
                     "Напиши дату выхода с больничного в формате ДД.ММ\n\nНапример: 15.05",
                     $this->getBackKeyboard(CommandType::ReturnSick->value),
-                    $chat_id
+                    $peer_id
                 );
 
                 return;
             }
-
         }
-
-        // Если дата не выбрана - ошибка
         if (!$date) {
             Log::warning('Неверный выбор даты', ['text' => $text, 'payload' => $this->payload]);
             $this->sendMessage(
                 '❌ Пожалуйста, выбери дату с помощью кнопок ниже:',
                 $this->getDateKeyboard(),
-                $chat_id
+                $peer_id
             );
 
             return;
@@ -212,30 +202,22 @@ class ReturnSickCommand extends BaseCommand
         $msg = "ВЫХОД С БОЛНИЧНОГО\n\n";
         $msg .= "Сотрудник: {$customName}\n";
         $msg .= "Страница ВК: https://vk.com/{$username}\n";
-        $msg .= "Дата выхода: `{$date}`\n";
+        $msg .= "Дата выхода: {$date}\n";
         $msg .= 'Время: '.date('d.m.Y H:i:s');
-        // Отправляем админу
-        $this->sendToAdminWithMarkdown($msg);
 
-        // Сохраняем в лог
-        Log::info('Запись о выходе с больничного', [
-            'user_id' => $telegram_id,
-            'user_name' => $user->name,
-            'date' => $date,
-        ]);
+        $this->sendToAdminWithMarkdown($msg, $peer_id);
 
-        // Очищаем состояние
-        $user->command = CommandType::None->value;
-        $user->state = UserState::None->value;
-        $user->prev_state = UserState::None->value;
-        $user->data = null;
-        $user->save();
+        //        Log::info('Запись о выходе с больничного', [
+        //            'user_id' => $telegram_id,
+        //            'user_name' => $user->name,
+        //            'date' => $date,
+        //        ]);
+        $this->resetUserState($user);
 
-        // Показываем главное меню
         $this->sendMessage(
             'Готово! Информация о выходе с больничного передана руководству.',
             $this->getMainKeyboard(),
-            $chat_id
+            $peer_id
         );
     }
 
@@ -244,15 +226,14 @@ class ReturnSickCommand extends BaseCommand
      */
     private function handleWaitManualDate(TelegramUser $user, string $text, array $data): void
     {
-        $chat_id = $user->peer_id;
-        $telegram_id = $user->form_id;
+        $peer_id = $user->peer_id;
 
         // Проверяем формат даты ДД.ММ
         if (!preg_match('/^(0[1-9]|[12][0-9]|3[01])\.(0[1-9]|1[0-2])$/', $text)) {
             $this->sendMessage(
                 "❌ Неверный формат. Введи дату в формате ДД.ММ\n\nНапример: 15.05",
                 $this->getBackKeyboard(CommandType::ReturnSick->value),
-                $chat_id
+                $peer_id
             );
 
             return;
@@ -266,7 +247,7 @@ class ReturnSickCommand extends BaseCommand
             $this->sendMessage(
                 '❌ Такой даты не существует. Попробуй снова.',
                 $this->getBackKeyboard(CommandType::ReturnSick->value),
-                $chat_id
+                $peer_id
             );
 
             return;
@@ -280,7 +261,7 @@ class ReturnSickCommand extends BaseCommand
             $this->sendMessage(
                 '❌ Дата должна быть сегодня или позже.',
                 $this->getBackKeyboard(CommandType::ReturnSick->value),
-                $chat_id
+                $peer_id
             );
 
             return;
@@ -291,28 +272,22 @@ class ReturnSickCommand extends BaseCommand
         $customName = $user->name;
         $username = $userInfo['screen_name'] ?: ('id'.$user->form_id);
 
-        $msg = "Выход с больничного\n\n";
+        $msg = "ВЫХОД С БОЛЬНИЧНОГО\n\n";
         $msg .= "Сотрудник: {$customName}\n";
-        $msg .= "Username: @{$username}\n";
-        $msg .= "Дата выхода: `{$date}`\n";
-        // Отправляем админу
-        $this->sendToAdminWithMarkdown($msg);
+        $msg .= "Страница ВК: https://vk.com/{$username}\n";
+        $msg .= "Дата выхода: {$date}\n";
 
-        $description = "Дата выхода: `{$date}`\n";
+        $this->sendToAdminWithMarkdown($msg, $peer_id);
+
+        $description = "Дата выхода: {$date}\n";
         $this->logReturnSickEvent($user->id, $description, $username);
 
-        // Очищаем состояние
-        $user->command = CommandType::None->value;
-        $user->state = UserState::None->value;
-        $user->prev_state = UserState::None->value;
-        $user->data = null;
-        $user->save();
+        $this->resetUserState($user);
 
-        // Показываем главное меню
         $this->sendMessage(
             'Готово! Информация о выходе с больничного передана руководству.',
             $this->getMainKeyboard(),
-            $chat_id
+            $peer_id
         );
     }
 
@@ -329,7 +304,6 @@ class ReturnSickCommand extends BaseCommand
         $log->date = now();
         $log->save();
     }
-
 
     /**
      * Клавиатура выбора даты
@@ -371,7 +345,7 @@ class ReturnSickCommand extends BaseCommand
                         'action' => [
                             'type' => 'callback',
                             'label' => '◀️ Назад',
-                            'payload' => json_encode(['command' => 'return-sick', 'text' => 'back']),
+                            'payload' => json_encode(['command' => 'return-sick', 'text' => 'назад']),
                         ],
                         'color' => 'secondary',
                     ],
@@ -390,5 +364,4 @@ class ReturnSickCommand extends BaseCommand
 
         return json_encode($keyboard, JSON_UNESCAPED_UNICODE);
     }
-
 }

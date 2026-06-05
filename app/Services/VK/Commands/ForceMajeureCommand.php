@@ -4,7 +4,6 @@ namespace App\Services\VK\Commands;
 
 use App\Enums\CommandType;
 use App\Enums\UserState;
-use App\Models\AdminUser;
 use App\Models\TelegramUser;
 use App\Models\UserLog;
 use Illuminate\Support\Facades\Log;
@@ -20,10 +19,13 @@ class ForceMajeureCommand extends BaseCommand
 
     private const TYPE_SEVERAL_DAYS = 'Несколько дней';
 
+    /**
+     * @throws \JsonException
+     */
     public function execute(): void
     {
         $userId = $this->fromId;
-        $peerId = $this->peerId;
+        $peer_id = $this->peerId;
         $text = trim($this->payload['text'] ?? '');
 
         // Получаем или создаем пользователя
@@ -31,7 +33,7 @@ class ForceMajeureCommand extends BaseCommand
             ['form_id' => $userId],
             [
                 'name' => $this->getUserName(),
-                'peer_id' => $peerId,
+                'peer_id' => $peer_id,
                 'state' => UserState::None->value,
                 'command' => CommandType::ForceMajeure->value,
                 'prev_state' => UserState::None->value,
@@ -40,8 +42,8 @@ class ForceMajeureCommand extends BaseCommand
         );
 
         $user->command = CommandType::ForceMajeure->value;
-        if ($user->peer_id != $peerId) {
-            $user->peer_id = $peerId;
+        if ($user->peer_id != $peer_id) {
+            $user->peer_id = $peer_id;
         }
         $user->save();
 
@@ -49,19 +51,19 @@ class ForceMajeureCommand extends BaseCommand
         $prevState = $user->prev_state;
         $data = $user->getUserData();
 
-//        Log::info('ForceMajeureCommand', [
-//            'user_id' => $userId,
-//            'state' => $state,
-//            'prev_state' => $prevState,
-//            'text' => $text,
-//            'data' => $data,
-//        ]);
+        //        Log::info('ForceMajeureCommand', [
+        //            'user_id' => $userId,
+        //            'state' => $state,
+        //            'prev_state' => $prevState,
+        //            'text' => $text,
+        //            'data' => $data,
+        //        ]);
 
         // Обработка "Главное меню"
         $textLower = mb_strtolower($text);
-        if ($textLower === 'главное меню' || $textLower === 'меню' || $textLower === 'start') {
+        if ($textLower === 'start') {
             $this->resetUserState($user);
-            $startCommand = $this->commandFactory->make('start', $peerId, $userId, null);
+            $startCommand = $this->commandFactory->make('start', $peer_id, $userId, null);
             if ($startCommand) {
                 $startCommand->execute();
             }
@@ -69,29 +71,40 @@ class ForceMajeureCommand extends BaseCommand
             return;
         }
 
-        // Обработка кнопки "Назад"
         if ($textLower === 'назад') {
-            $this->handleBack($user, $prevState, $peerId, $data);
+            $this->handleBack($user, $prevState, $peer_id, $data);
 
             return;
         }
 
-        // обработка по состояниям
-        match ($state) {
-            UserState::FMWaitType->value => $this->handleWaitType($user, $text, $data),
-            UserState::FMWaitHours->value => $this->handleWaitHours($user, $text, $data),
-            UserState::FMWaitDays->value => $this->handleWaitDays($user, $text, $data),
-            UserState::FMWaitReason->value => $this->handleWaitReason($user, $text, $data),
-            UserState::FMConfirm->value => $this->handleConfirm($user, $text, $data),
-            default => $this->startForceMajeureFlow($user, $peerId),
-        };
+        switch ($state) {
+            case UserState::FMWaitType->value:
+                $this->handleWaitType($user, $text, $data);
+                break;
+            case UserState::FMWaitHours->value:
+                $this->handleWaitHours($user, $text, $data);
+                break;
+            case UserState::FMWaitDays->value:
+                $this->handleWaitDays($user, $text, $data);
+                break;
+            case UserState::FMWaitReason->value:
+                $this->handleWaitReason($user, $text, $data);
+                break;
+            case UserState::FMConfirm->value:
+                $this->handleConfirm($user, $text, $data);
+                break;
+            default:
+                $this->startForceMajeureFlow($user, $peer_id);
+                break;
+        }
     }
 
     /**
      * Начало потока: выбор типа отсутствия
+     *
      * @throws \JsonException
      */
-    private function startForceMajeureFlow(TelegramUser $user, int $peerId): void
+    private function startForceMajeureFlow(TelegramUser $user, int $peer_id): void
     {
         $user->state = UserState::FMWaitType->value;
         $user->prev_state = UserState::None->value;
@@ -101,24 +114,25 @@ class ForceMajeureCommand extends BaseCommand
         $this->sendMessage(
             'Укажи, в каких временных рамках будешь отсутствовать:',
             $this->getTypeKeyboard(),
-            $peerId
+            $peer_id
         );
     }
 
     /**
      * Обработка выбора типа отсутствия
+     *
      * @throws \JsonException
      */
     private function handleWaitType(TelegramUser $user, string $text, array $data): void
     {
-        $peerId = $user->peer_id;
+        $peer_id = $user->peer_id;
         $validTypes = [self::TYPE_HOURS, self::TYPE_ALL_DAY, self::TYPE_SEVERAL_DAYS];
 
         if (!in_array($text, $validTypes)) {
             $this->sendMessage(
                 '❌ Пожалуйста, выбери временной промежуток с помощью кнопок ниже:',
                 $this->getTypeKeyboard(),
-                $peerId
+                $peer_id
             );
 
             return;
@@ -135,7 +149,7 @@ class ForceMajeureCommand extends BaseCommand
             $this->sendMessage(
                 'Сколько часов ты будешь отсутствовать? (укажи числом):',
                 $this->getTypeKeyboard(),
-                $peerId
+                $peer_id
             );
 
             return;
@@ -149,7 +163,7 @@ class ForceMajeureCommand extends BaseCommand
             $this->sendMessage(
                 'Сколько дней ты будешь отсутствовать? (укажи числом):',
                 $this->getTypeKeyboard(),
-                $peerId
+                $peer_id
             );
 
             return;
@@ -164,7 +178,7 @@ class ForceMajeureCommand extends BaseCommand
         $this->sendMessage(
             'Укажи причину отсутствия:',
             $this->getBackKeyboard(CommandType::ForceMajeure->value),
-            $peerId
+            $peer_id
         );
     }
 
@@ -173,13 +187,13 @@ class ForceMajeureCommand extends BaseCommand
      */
     private function handleWaitHours(TelegramUser $user, string $text, array $data): void
     {
-        $peerId = $user->peer_id;
+        $peer_id = $user->peer_id;
 
         if (!is_numeric($text)) {
             $this->sendMessage(
                 '❌ Ошибка! Укажи количество часов числом (например: 3):',
                 $this->getBackKeyboard(CommandType::ForceMajeure->value),
-                $peerId
+                $peer_id
             );
 
             return;
@@ -190,7 +204,7 @@ class ForceMajeureCommand extends BaseCommand
             $this->sendMessage(
                 '❌ Ошибка! Укажи число от 1 до 24:',
                 $this->getBackKeyboard(CommandType::ForceMajeure->value),
-                $peerId
+                $peer_id
             );
 
             return;
@@ -204,7 +218,7 @@ class ForceMajeureCommand extends BaseCommand
         $this->sendMessage(
             'Укажи причину отсутствия:',
             $this->getBackKeyboard(CommandType::ForceMajeure->value),
-            $peerId
+            $peer_id
         );
     }
 
@@ -213,13 +227,13 @@ class ForceMajeureCommand extends BaseCommand
      */
     private function handleWaitDays(TelegramUser $user, string $text, array $data): void
     {
-        $peerId = $user->peer_id;
+        $peer_id = $user->peer_id;
 
         if (!is_numeric($text)) {
             $this->sendMessage(
                 '❌ Ошибка! Укажи количество дней числом (например: 2):',
                 $this->getBackKeyboard(CommandType::ForceMajeure->value),
-                $peerId
+                $peer_id
             );
 
             return;
@@ -230,7 +244,7 @@ class ForceMajeureCommand extends BaseCommand
             $this->sendMessage(
                 '❌ Ошибка! Укажи число от 1 до 30:',
                 $this->getBackKeyboard(CommandType::ForceMajeure->value),
-                $peerId
+                $peer_id
             );
 
             return;
@@ -244,7 +258,7 @@ class ForceMajeureCommand extends BaseCommand
         $this->sendMessage(
             'Укажи причину отсутствия:',
             $this->getBackKeyboard(CommandType::ForceMajeure->value),
-            $peerId
+            $peer_id
         );
     }
 
@@ -253,13 +267,13 @@ class ForceMajeureCommand extends BaseCommand
      */
     private function handleWaitReason(TelegramUser $user, string $text, array $data): void
     {
-        $peerId = $user->peer_id;
+        $peer_id = $user->peer_id;
 
         if (empty($text)) {
             $this->sendMessage(
                 '❌ Пожалуйста, напиши причину отсутствия:',
                 $this->getBackKeyboard(CommandType::ForceMajeure->value),
-                $peerId
+                $peer_id
             );
 
             return;
@@ -269,7 +283,7 @@ class ForceMajeureCommand extends BaseCommand
             $this->sendMessage(
                 '❌ Ошибка! Текст слишком длинный, опиши более кратко (до 200 символов):',
                 $this->getBackKeyboard(CommandType::ForceMajeure->value),
-                $peerId
+                $peer_id
             );
 
             return;
@@ -285,12 +299,12 @@ class ForceMajeureCommand extends BaseCommand
         $reply .= "Тип отсутствия: {$data['type']}\n";
         $reply .= "Длительность: {$data['duration']}\n";
         $reply .= "Причина: {$data['reason']}\n\n";
-        $reply .= 'Все верно? Напиши *Да* или *Исправить*';
+        $reply .= "Все верно? Нажми 'Да' или 'Исправить'";
 
         $this->sendMessage(
             $reply,
             $this->getConfirmKeyboard(CommandType::ForceMajeure->value),
-            $peerId
+            $peer_id
         );
     }
 
@@ -299,7 +313,7 @@ class ForceMajeureCommand extends BaseCommand
      */
     private function handleConfirm(TelegramUser $user, string $text, array $data): void
     {
-        $peerId = $user->peer_id;
+        $peer_id = $user->peer_id;
         $userId = $user->form_id;
         $textLower = mb_strtolower(trim($text));
 
@@ -311,12 +325,12 @@ class ForceMajeureCommand extends BaseCommand
             $msg = "ФOРС-МАЖОР\n\n";
             $msg .= "Сотрудник: {$customName}\n";
             $msg .= "Страница ВК: https://vk.com/{$username}\n";
-            $msg .= "Тип: `{$data['type']}`\n";
-            $msg .= "Длительность: `{$data['duration']}`\n";
-            $msg .= "Причина: `{$data['reason']}`\n";
+            $msg .= "Тип: {$data['type']}\n";
+            $msg .= "Длительность: {$data['duration']}\n";
+            $msg .= "Причина: {$data['reason']}\n";
             $msg .= 'Время: '.date('d.m.Y H:i:s');
 
-            $this->sendToAdminWithMarkdown($msg);
+            $this->sendToAdminWithMarkdown($msg, $peer_id);
 
             $description = "Тип: `{$data['type']}`\n"
                 ."Длительность: `{$data['duration']}`\n"
@@ -329,7 +343,7 @@ class ForceMajeureCommand extends BaseCommand
             $this->sendMessage(
                 'Готово! Информация передана руководству.',
                 $this->getMainKeyboard(),
-                $peerId
+                $peer_id
             );
 
             return;
@@ -343,7 +357,7 @@ class ForceMajeureCommand extends BaseCommand
             $this->sendMessage(
                 'Укажи в каких временных рамках будешь отсутствовать:',
                 $this->getMainKeyboard(),
-                $peerId
+                $peer_id
             );
 
             return;
@@ -352,29 +366,29 @@ class ForceMajeureCommand extends BaseCommand
         $this->sendMessage(
             'Напиши *Да* для подтверждения или *Исправить*, чтобы внести правки.',
             $this->getConfirmKeyboard(CommandType::ForceMajeure->value),
-            $peerId
+            $peer_id
         );
     }
 
     /**
      * Обработка кнопки "Назад"
      */
-    private function handleBack(TelegramUser $user, string $prevState, int $peerId, array $data): void
+    private function handleBack(TelegramUser $user, string $prevState, int $peer_id, array $data): void
     {
         match ($prevState) {
-            UserState::FMWaitType->value => $this->startForceMajeureFlow($user, $peerId),
+            UserState::FMWaitType->value => $this->startForceMajeureFlow($user, $peer_id),
             UserState::FMWaitHours->value,
-            UserState::FMWaitDays->value => $this->handleBackFromDuration($user, $peerId, $data),
-            UserState::FMWaitReason->value => $this->handleBackFromReason($user, $peerId, $data),
-            UserState::FMConfirm->value => $this->handleBackFromConfirm($user, $peerId, $data),
-            default => $this->startForceMajeureFlow($user, $peerId),
+            UserState::FMWaitDays->value => $this->handleBackFromDuration($user, $peer_id, $data),
+            UserState::FMWaitReason->value => $this->handleBackFromReason($user, $peer_id, $data),
+            UserState::FMConfirm->value => $this->handleBackFromConfirm($user, $peer_id, $data),
+            default => $this->startForceMajeureFlow($user, $peer_id),
         };
     }
 
     /**
      * Возврат из ввода длительности (часы/дни)
      */
-    private function handleBackFromDuration(TelegramUser $user, int $peerId, array $data): void
+    private function handleBackFromDuration(TelegramUser $user, int $peer_id, array $data): void
     {
         $user->state = UserState::FMWaitType->value;
         $user->prev_state = UserState::FMWaitHours->value; // или WaitDays
@@ -384,14 +398,14 @@ class ForceMajeureCommand extends BaseCommand
         $this->sendMessage(
             'Укажи, в каких временных рамках будешь отсутствовать:',
             $this->getMainKeyboard(),
-            $peerId
+            $peer_id
         );
     }
 
     /**
      * Возврат из ввода причины
      */
-    private function handleBackFromReason(TelegramUser $user, int $peerId, array $data): void
+    private function handleBackFromReason(TelegramUser $user, int $peer_id, array $data): void
     {
         $prevState = $data['prev_state'] ?? UserState::FMWaitType->value;
         $user->state = $prevState;
@@ -403,19 +417,19 @@ class ForceMajeureCommand extends BaseCommand
             $this->sendMessage(
                 'Сколько часов ты будешь отсутствовать? (укажи числом):',
                 $this->getBackKeyboard(CommandType::ForceMajeure->value),
-                $peerId
+                $peer_id
             );
         } elseif ($prevState === UserState::FMWaitDays->value) {
             $this->sendMessage(
                 'Сколько дней ты будешь отсутствовать? (укажи числом):',
                 $this->getBackKeyboard(CommandType::ForceMajeure->value),
-                $peerId
+                $peer_id
             );
         } else {
             $this->sendMessage(
                 'Укажи причину отсутствия:',
                 $this->getBackKeyboard(CommandType::ForceMajeure->value),
-                $peerId
+                $peer_id
             );
         }
     }
@@ -423,7 +437,7 @@ class ForceMajeureCommand extends BaseCommand
     /**
      * Возврат из подтверждения
      */
-    private function handleBackFromConfirm(TelegramUser $user, int $peerId, array $data): void
+    private function handleBackFromConfirm(TelegramUser $user, int $peer_id, array $data): void
     {
         $user->state = UserState::FMWaitReason->value;
         $user->prev_state = UserState::FMConfirm->value;
@@ -433,7 +447,7 @@ class ForceMajeureCommand extends BaseCommand
         $this->sendMessage(
             'Укажи причину отсутствия:',
             $this->getBackKeyboard(CommandType::ForceMajeure->value),
-            $peerId
+            $peer_id
         );
     }
 
@@ -502,6 +516,4 @@ class ForceMajeureCommand extends BaseCommand
             'one_time' => false,
         ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
     }
-
-
 }

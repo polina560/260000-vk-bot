@@ -50,7 +50,7 @@ class DelayCommand extends BaseCommand
         //        ]);
 
         $textLower = mb_strtolower($text);
-        if ($textLower === 'главное меню' || $textLower === 'меню' || $textLower === 'start') {
+        if ($textLower === 'start') {
             $this->resetUserState($user);
             $startCommand = $this->commandFactory->make('start', $chat_id, $telegram_id, null);
             if ($startCommand) {
@@ -249,7 +249,7 @@ class DelayCommand extends BaseCommand
      */
     private function handleConfirm(TelegramUser $user, string $text, array $data): void
     {
-        $chat_id = $user->peer_id;
+        $peer_id = $user->peer_id;
         $telegram_id = $user->form_id;
         $textLower = mb_strtolower(trim($text));
 
@@ -263,11 +263,11 @@ class DelayCommand extends BaseCommand
             $msg = "ОПОЗДАНИЕ\n\n";
             $msg .= "Сотрудник: {$customName}\n";
             $msg .= "Страница ВК: https://vk.com/{$username}\n";
-            $msg .= "Опоздание: `{$data['delay_minutes']} мин`\n";
-            $msg .= "Причина: `{$data['reason']}`\n";
+            $msg .= "Опоздание: {$data['delay_minutes']} мин\n";
+            $msg .= "Причина: {$data['reason']}\n";
 
             // Отправляем администратору
-            $this->sendToAdminWithMarkdown($msg);
+            $this->sendToAdminWithMarkdown($msg, $peer_id);
 
             $description = "Опоздание на: `{$data['delay_minutes']} мин`\n"
                 ."Причина: `{$data['reason']}`\n";
@@ -276,7 +276,7 @@ class DelayCommand extends BaseCommand
             $this->resetUserState($user);
 
             // Показываем главное меню
-            $this->sendMessage('Готово! Информация об опоздании передана руководству.', $this->getMainKeyboard(), $chat_id);
+            $this->sendMessage('Готово! Информация об опоздании передана руководству.', $this->getMainKeyboard(), $peer_id);
 
             return;
 
@@ -289,7 +289,7 @@ class DelayCommand extends BaseCommand
             $this->sendMessage(
                 'Начнем заново. Укажи на сколько минут ты опаздываешь:',
                 $this->getTimeKeyboard(CommandType::Delay->value),
-                $chat_id
+                $peer_id
             );
 
             return;
@@ -297,7 +297,7 @@ class DelayCommand extends BaseCommand
             $this->sendMessage(
                 "Напиши 'Да' для подтверждения или 'Исправить', чтобы внести исправления.",
                 $this->getConfirmKeyboard(CommandType::Delay->value),
-                $chat_id
+                $peer_id
             );
 
             return;

@@ -4,7 +4,6 @@ namespace App\Services\VK\Commands;
 
 use App\Enums\CommandType;
 use App\Enums\UserState;
-use App\Models\AdminUser;
 use App\Models\TelegramUser;
 use App\Models\UserLog;
 use Illuminate\Support\Facades\Log;
@@ -14,7 +13,7 @@ class OtherCommand extends BaseCommand
     public function execute(): void
     {
         $userId = $this->fromId;
-        $peerId = $this->peerId;
+        $peer_id = $this->peerId;
         $text = trim($this->payload['text'] ?? '');
 
         // Получаем или создаем пользователя
@@ -22,7 +21,7 @@ class OtherCommand extends BaseCommand
             ['form_id' => $userId],
             [
                 'name' => $this->getUserName(),
-                'peer_id' => $peerId,
+                'peer_id' => $peer_id,
                 'state' => UserState::None->value,
                 'command' => CommandType::Other->value,
                 'prev_state' => UserState::None->value,
@@ -31,8 +30,8 @@ class OtherCommand extends BaseCommand
         );
 
         $user->command = CommandType::Other->value;
-        if ($user->peer_id != $peerId) {
-            $user->peer_id = $peerId;
+        if ($user->peer_id != $peer_id) {
+            $user->peer_id = $peer_id;
         }
         $user->save();
 
@@ -40,19 +39,19 @@ class OtherCommand extends BaseCommand
         $prevState = $user->prev_state;
         $data = $user->getUserData();
 
-        Log::info('OtherCommand', [
-            'user_id' => $userId,
-            'state' => $state,
-            'prev_state' => $prevState,
-            'text' => $text,
-            'data' => $data,
-        ]);
+        //        Log::info('OtherCommand', [
+        //            'user_id' => $userId,
+        //            'state' => $state,
+        //            'prev_state' => $prevState,
+        //            'text' => $text,
+        //            'data' => $data,
+        //        ]);
 
         // Обработка "Главное меню"
         $textLower = mb_strtolower($text);
-        if ($textLower === 'главное меню' || $textLower === 'меню' || $textLower === 'start') {
+        if ($textLower === 'start') {
             $this->resetUserState($user);
-            $startCommand = $this->commandFactory->make('start', $peerId, $userId, null);
+            $startCommand = $this->commandFactory->make('start', $peer_id, $userId, null);
             if ($startCommand) {
                 $startCommand->execute();
             }
@@ -60,25 +59,29 @@ class OtherCommand extends BaseCommand
             return;
         }
 
-        // Обработка кнопки "Назад"
         if ($textLower === 'назад') {
-            $this->handleBack($user, $prevState, $peerId, $data);
+            $this->handleBack($user, $prevState, $peer_id, $data);
 
             return;
         }
 
-        // обработка по состояниям
-        match ($state) {
-            UserState::OtherWaitText->value => $this->handleWaitText($user, $text, $data),
-            UserState::OtherConfirm->value => $this->handleConfirm($user, $text, $data),
-            default => $this->startOtherFlow($user, $peerId),
-        };
+        switch ($state) {
+            case UserState::OtherWaitText->value:
+                $this->handleWaitText($user, $text, $data);
+                break;
+            case UserState::OtherConfirm->value:
+                $this->handleConfirm($user, $text, $data);
+                break;
+            default:
+                $this->startOtherFlow($user, $peer_id);
+                break;
+        }
     }
 
     /**
      * Начало потока: запрос текста сообщения
      */
-    private function startOtherFlow(TelegramUser $user, int $peerId): void
+    private function startOtherFlow(TelegramUser $user, int $peer_id): void
     {
         $user->state = UserState::OtherWaitText->value;
         $user->prev_state = UserState::None->value;
@@ -88,7 +91,7 @@ class OtherCommand extends BaseCommand
         $this->sendMessage(
             'Укажи, что хочешь сообщить:',
             $this->getBackKeyboard(CommandType::Other->value),
-            $peerId
+            $peer_id
         );
     }
 
@@ -97,13 +100,13 @@ class OtherCommand extends BaseCommand
      */
     private function handleWaitText(TelegramUser $user, string $text, array $data): void
     {
-        $peerId = $user->peer_id;
+        $peer_id = $user->peer_id;
 
         if (empty($text)) {
             $this->sendMessage(
                 '❌ Пожалуйста, напиши своё сообщение:',
                 $this->getBackKeyboard(CommandType::Other->value),
-                $peerId
+                $peer_id
             );
 
             return;
@@ -113,7 +116,7 @@ class OtherCommand extends BaseCommand
             $this->sendMessage(
                 '❌ Ошибка! Текст слишком длинный, сократи его (до 200 символов):',
                 $this->getBackKeyboard(CommandType::Other->value),
-                $peerId
+                $peer_id
             );
 
             return;
@@ -125,14 +128,14 @@ class OtherCommand extends BaseCommand
         $user->data = $data;
         $user->save();
 
-        $reply = "Проверь информацию:\n\n";
+        $reply = "Проверь информацию: ";
         $reply .= $data['text']."\n\n";
-        $reply .= 'Все верно? Напиши *Да* или *Исправить*';
+        $reply .= "Все верно? Нажми 'Да' или 'Исправить'";
 
         $this->sendMessage(
             $reply,
             $this->getConfirmKeyboard(CommandType::Other->value),
-            $peerId
+            $peer_id
         );
     }
 
@@ -141,7 +144,7 @@ class OtherCommand extends BaseCommand
      */
     private function handleConfirm(TelegramUser $user, string $text, array $data): void
     {
-        $peerId = $user->peer_id;
+        $peer_id = $user->peer_id;
         $userId = $user->form_id;
         $textLower = mb_strtolower(trim($text));
 
@@ -153,9 +156,9 @@ class OtherCommand extends BaseCommand
             $msg = "ОПОВЕЩЕНИЕ\n\n";
             $msg .= "Сотрудник: {$customName}\n";
             $msg .= "Страница ВК: https://vk.com/{$username}\n";
-            $msg .= "Сообщение:\n`{$data['text']}`\n";
+            $msg .= "Сообщение: {$data['text']}\n";
 
-            $this->sendToAdminWithMarkdown($msg);
+            $this->sendToAdminWithMarkdown($msg, $peer_id);
 
             $description = "Сообщение:\n`{$data['text']}`\n";
             $this->logOtherEvent($user->id, $msg, $description);
@@ -165,7 +168,7 @@ class OtherCommand extends BaseCommand
             $this->sendMessage(
                 'Готово! Информация передана руководству.',
                 $this->getMainKeyboard(),
-                $peerId
+                $peer_id
             );
 
             return;
@@ -179,7 +182,7 @@ class OtherCommand extends BaseCommand
             $this->sendMessage(
                 'Хорошо, напиши сообщение заново:',
                 $this->getBackKeyboard(CommandType::Other->value),
-                $peerId
+                $peer_id
             );
 
             return;
@@ -188,18 +191,18 @@ class OtherCommand extends BaseCommand
         $this->sendMessage(
             'Напиши *Да* для подтверждения или *Исправить*, чтобы внести правки.',
             $this->getConfirmKeyboard(CommandType::Other->value),
-            $peerId
+            $peer_id
         );
     }
 
     /**
      * Обработка кнопки "Назад"
      */
-    private function handleBack(TelegramUser $user, string $prevState, int $peerId, array $data): void
+    private function handleBack(TelegramUser $user, string $prevState, int $peer_id, array $data): void
     {
         if ($prevState === UserState::OtherWaitText->value) {
             // Если были в wait_text — возвращаемся к началу
-            $this->startOtherFlow($user, $peerId);
+            $this->startOtherFlow($user, $peer_id);
 
             return;
         }
@@ -213,7 +216,7 @@ class OtherCommand extends BaseCommand
         $this->sendMessage(
             'Укажи, что хочешь сообщить:',
             $this->getBackKeyboard(CommandType::Other->value),
-            $peerId
+            $peer_id
         );
     }
 
@@ -230,6 +233,4 @@ class OtherCommand extends BaseCommand
         $log->date = now();
         $log->save();
     }
-
-
 }
