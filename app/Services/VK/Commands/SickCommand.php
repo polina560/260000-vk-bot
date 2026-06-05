@@ -285,12 +285,7 @@ class SickCommand extends BaseCommand
 
             $this->logSickChange($user->id, $description, $username);
 
-            // Очищаем состояние пользователя
-            $user->command = CommandType::None->value;
-            $user->state = UserState::None->value;
-            $user->prev_state = UserState::None->value;
-            $user->data = null;
-            $user->save();
+            $this->resetUserState($user);
 
             // Показываем главное меню
             $this->sendMessage(
