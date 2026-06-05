@@ -88,7 +88,6 @@ class VkCallbackHandler
 //                'previous_state' => $currentState,
 //                'previous_command' => $currentCommand,
 //            ]);
-
             // Очищаем состояние пользователя
             $user->command = CommandType::None->value;
             $user->state = UserState::None->value;
@@ -101,7 +100,6 @@ class VkCallbackHandler
             if ($startCommand) {
                 $startCommand->execute();
             }
-
             return;
         }
 
@@ -242,41 +240,41 @@ class VkCallbackHandler
     }
 
 
-    /**
-     * Отправка сообщения администратору
-     */
-    protected function sendToAdmin(string $message, array $attachments = []): void
-    {
-        try {
-            $params = [
-                'peer_id' => $this->adminId,
-                'message' => $message,
-                'random_id' => random_int(1, 1000000),
-            ];
-
-            if (!empty($attachments)) {
-                $attachmentStrings = [];
-                foreach (array_slice($attachments, 0, 10) as $attachment) {
-                    if ($attachment->type === 'photo') {
-                        $photo = $attachment->photo;
-                        if (!empty($photo->sizes)) {
-                            $maxSize = end($photo->sizes);
-                            $attachmentStrings[] = "photo{$photo->owner_id}_{$photo->id}";
-                        }
-                    }
-                }
-                if (!empty($attachmentStrings)) {
-                    $params['attachment'] = implode(',', $attachmentStrings);
-                }
-            }
-
-            $this->vk->messages()->send($this->accessToken, $params);
-            Log::info('Сообщение отправлено администратору');
-
-        } catch (\Exception $e) {
-            Log::error('Ошибка отправки админу: '.$e->getMessage());
-        }
-    }
+//    /**
+//     * Отправка сообщения администратору
+//     */
+//    protected function sendToAdmin(string $message, array $attachments = []): void
+//    {
+//        try {
+//            $params = [
+//                'peer_id' => $this->adminId,
+//                'message' => $message,
+//                'random_id' => random_int(1, 1000000),
+//            ];
+//
+//            if (!empty($attachments)) {
+//                $attachmentStrings = [];
+//                foreach (array_slice($attachments, 0, 10) as $attachment) {
+//                    if ($attachment->type === 'photo') {
+//                        $photo = $attachment->photo;
+//                        if (!empty($photo->sizes)) {
+//                            $maxSize = end($photo->sizes);
+//                            $attachmentStrings[] = "photo{$photo->owner_id}_{$photo->id}";
+//                        }
+//                    }
+//                }
+//                if (!empty($attachmentStrings)) {
+//                    $params['attachment'] = implode(',', $attachmentStrings);
+//                }
+//            }
+//
+//            $this->vk->messages()->send($this->accessToken, $params);
+//            Log::info('Сообщение отправлено администратору');
+//
+//        } catch (\Exception $e) {
+//            Log::error('Ошибка отправки админу: '.$e->getMessage());
+//        }
+//    }
 
     /**
      * Получение информации о пользователе
@@ -309,25 +307,6 @@ class VkCallbackHandler
             'screen_name' => '',
             'link' => "https://vk.com/id{$userId}",
         ];
-    }
-
-    /**
-     * Форматирование сообщения для администратора
-     */
-    protected function formatAdminMessage(array $userInfo, string $text, array $attachments): string
-    {
-        $message = "📨 Новое сообщение от пользователя!\n\n";
-        $message .= "👤 Пользователь: {$userInfo['first_name']} {$userInfo['last_name']}\n";
-        $message .= "🔗 Ссылка: {$userInfo['link']}\n\n";
-        $message .= "💬 Сообщение:\n{$text}\n";
-
-        if (!empty($attachments)) {
-            $message .= "\n📎 Вложения: ".count($attachments)." шт.\n";
-        }
-
-        $message .= "\n🕐 Время: ".date('d.m.Y H:i:s');
-
-        return $message;
     }
 
     /**

@@ -19,72 +19,7 @@ class StartCommand extends BaseCommand
         $message .= "• Другое - другие вопросы\n";
 
 
-        $keyboard = $this->getKeyboardStart();
+        $keyboard = $this->getMainKeyboard();
         $this->sendMessage($message, $keyboard);
-    }
-
-    private function getKeyboardStart(): string
-    {
-        $keyboard = [
-            'buttons' => [
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🚗 Опоздание',
-                            'payload' => json_encode(['command' => 'delay'])
-                        ],
-                        'color' => 'primary'
-                    ],
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🤒 Заболел',
-                            'payload' => json_encode(['command' => 'sick'])
-                        ],
-                        'color' => 'secondary'
-                    ],
-                ],
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '🏥 Выхожу с больничного',
-                            'payload' => json_encode(['command' => 'return-sick'])
-                        ],
-                        'color' => 'positive'
-                    ],
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '📅 Изменения в расписании',
-                            'payload' => json_encode(['command' => 'schedule'])
-                        ],
-                        'color' => 'primary'
-                    ],
-                ],
-                [
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '⚠️ Форс-мажор',
-                            'payload' => json_encode(['command' => 'force-majeure'])
-                        ],
-                        'color' => 'negative'
-                    ],
-                    [
-                        'action' => [
-                            'type' => 'text',
-                            'label' => '💬 Другое',
-                            'payload' => json_encode(['command' => 'other'])
-                        ],
-                        'color' => 'primary'
-                    ],
-                ],
-            ],
-            'one_time' => false,
-        ];
-
-        return json_encode($keyboard, JSON_UNESCAPED_UNICODE);
     }
 }

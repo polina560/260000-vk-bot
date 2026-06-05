@@ -4,7 +4,6 @@ namespace App\Services\VK\Commands;
 
 use App\Enums\CommandType;
 use App\Enums\UserState;
-use App\Models\AdminUser;
 use App\Models\TelegramUser;
 use App\Models\UserLog;
 use Illuminate\Support\Facades\Log;
@@ -43,13 +42,13 @@ class SickCommand extends BaseCommand
         $prevState = $user->prev_state;
         $data = $user->getUserData();
 
-//        Log::info('SickCommand', [
-//            'user_id' => $telegram_id,
-//            'state' => $state,
-//            'prev_state' => $prevState,
-//            'text' => $text,
-//            'data' => $data,
-//        ]);
+        //        Log::info('SickCommand', [
+        //            'user_id' => $telegram_id,
+        //            'state' => $state,
+        //            'prev_state' => $prevState,
+        //            'text' => $text,
+        //            'data' => $data,
+        //        ]);
 
         $textLower = mb_strtolower($text);
         if ($textLower === 'главное меню' || $textLower === 'меню' || $textLower === 'start') {
@@ -330,10 +329,10 @@ class SickCommand extends BaseCommand
     private function handleBack(TelegramUser $user, string $prevState, int $peerId, array $data): void
     {
         match ($prevState) {
-            UserState::SickWaitDays->value   => $this->handleBackFromDays($user, $peerId, $data),
+            UserState::SickWaitDays->value => $this->handleBackFromDays($user, $peerId, $data),
             UserState::SickWaitRemote->value => $this->handleBackFromRemote($user, $peerId, $data),
             UserState::SickWaitComment->value => $this->handleBackFromComment($user, $peerId, $data),
-            default                          => null, // или $this->startSickFlow(...)
+            default => null,
         };
     }
 
@@ -505,6 +504,4 @@ class SickCommand extends BaseCommand
 
         return json_encode($keyboard, JSON_UNESCAPED_UNICODE);
     }
-
-
 }
